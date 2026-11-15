@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2a1810">
+  <title>Гриль-Майстер</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=1">
+</head>
+<body>
+  <div id="app">
+    <header id="hud">
+      <div class="pill" id="progress"><span class="ic" id="progIc"></span><b id="cnt">0/0</b></div>
+      <div id="lvlBox"><div id="lvl">&nbsp;</div><div class="bar"><i id="bar"></i></div></div>
+      <div class="pill" id="coinsPill"><span class="ic" id="coinIc"></span><b id="coins">0</b></div>
+      <button id="pauseBtn" class="round-btn" aria-label="Pause"></button>
+    </header>
+    <section id="orders"><div id="plates"></div></section>
+    <section id="rack"><div class="slots"></div></section>
+    <main id="boardWrap"><div id="board"></div></main>
+    <nav id="boosters">
+      <button class="boost" data-b="undo"><span class="bi"></span><span class="price"><i></i><b></b></span></button>
+      <button class="boost" data-b="slot"><span class="bi"></span><span class="price"><i></i><b></b></span></button>
+      <button class="boost" data-b="shuffle"><span class="bi"></span><span class="price"><i></i><b></b></span></button>
+      <button class="boost" data-b="chef"><span class="bi"></span><span class="price"><i></i><b></b></span></button>
+    </nav>
+  </div>
+  <div id="fx"></div>
+  <div id="overlay" class="hidden"><div class="card" id="card"></div></div>
+  <div id="toast"></div>
+
+  <script src="js/engine.js?v=1"></script>
+  <script src="js/art.js?v=1"></script>
+  <script src="js/main.js?v=1"></script>
+</body>
+</html>

@@ -1,305 +1,276 @@
-/* Grill Master – hand-drawn SVG art for the skewers and UI icons. */
+/* Grill Master – chunky cartoon SVG art for the skewers and UI icons.
+   Each skewer: viewBox 0 0 60 120, food fills x 4..56 / y 2..100, short stick handle below. */
 (function (root) {
   'use strict';
 
-  var NAMES_UK = ['Шашлик', 'Курка з цибулею', 'Креветки', 'Кукурудза', 'Ковбаски', 'Овочі гриль',
-    'Маршмелоу', 'Яблуко в карамелі', 'Полуниця в шоколаді', 'Люля-кебаб', 'Печериці', 'Лосось',
-    'Баклажан', 'Картопля з салом'];
-  var NAMES_EN = ['Shashlik', 'Chicken & leek', 'Shrimp', 'Corn', 'Sausages', 'Grilled veggies',
-    'Marshmallows', 'Candy apple', 'Choco strawberries', 'Lula kebab', 'Mushrooms', 'Salmon',
-    'Eggplant', 'Potato & bacon'];
+  var NAMES_UK = ['Шашлик', 'Курка', 'Креветки', 'Кукурудза', 'Ковбаска', 'Овочі',
+    'Маршмелоу', 'Яблуко в карамелі', 'Полуниця в шоколаді', 'Броколі', 'Печериці', 'Чорниця',
+    'Баклажан', 'Пончик'];
+  var NAMES_EN = ['Beef kebab', 'Chicken', 'Shrimp', 'Corn', 'Sausage', 'Veggies',
+    'Marshmallows', 'Candy apple', 'Choc strawberries', 'Broccoli', 'Mushrooms', 'Blueberries',
+    'Eggplant', 'Donut'];
 
-  function lg(id, stops, x1, y1, x2, y2) {
-    return '<linearGradient id="' + id + '" x1="' + (x1 || 0) + '" y1="' + (y1 || 0) + '" x2="' + (x2 === undefined ? 0 : x2) + '" y2="' + (y2 === undefined ? 1 : y2) + '">' +
-      stops.map(function (s) { return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"/>'; }).join('') + '</linearGradient>';
+  var OL = '#3b1d0e'; // outline colour for every shape
+  var CHAR = '#2a0f05'; // grill char marks
+
+  function f(v) { return +v.toFixed(1); }
+  function stops(list) {
+    return list.map(function (s) {
+      return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"' + (s[2] === undefined ? '' : ' stop-opacity="' + s[2] + '"') + '/>';
+    }).join('');
   }
-  function rg(id, stops, cx, cy, r) {
-    return '<radialGradient id="' + id + '" cx="' + (cx || 0.5) + '" cy="' + (cy || 0.5) + '" r="' + (r || 0.6) + '">' +
-      stops.map(function (s) { return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"/>'; }).join('') + '</radialGradient>';
+  function lg(id, list, x1, y1, x2, y2) {
+    return '<linearGradient id="' + id + '" x1="' + (x1 || 0) + '" y1="' + (y1 || 0) + '" x2="' + (x2 === undefined ? 0 : x2) + '" y2="' + (y2 === undefined ? 1 : y2) + '">' + stops(list) + '</linearGradient>';
+  }
+  // 3-tone cel shading: soft light spot top-left -> base colour -> hard-edged darker crescent lower right.
+  function cel(id, light, base, shade, k) {
+    k = k || 0.72;
+    return '<radialGradient id="' + id + '" cx=".34" cy=".28" r=".85">' + stops([[0, light], [k * 0.6, base], [k, base], [k, shade]]) + '</radialGradient>';
   }
   function g(cx, cy, rot, body, sx) {
     return '<g transform="translate(' + cx + ' ' + cy + ')' + (rot ? ' rotate(' + rot + ')' : '') + (sx ? ' scale(' + sx + ' 1)' : '') + '">' + body + '</g>';
   }
-  function shine(x, y, rx, ry, op) {
-    return '<ellipse cx="' + x + '" cy="' + y + '" rx="' + rx + '" ry="' + ry + '" fill="#fff" opacity="' + (op || 0.35) + '"/>';
+  function sk(sw) { return sw === 0 ? '' : ' stroke="' + OL + '" stroke-width="' + (sw || 2.8) + '" stroke-linejoin="round"'; }
+  function P(d, fill, sw, ex) { return '<path d="' + d + '" fill="' + fill + '"' + sk(sw) + (ex || '') + '/>'; }
+  function E(cx, cy, rx, ry, fill, sw) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + fill + '"' + sk(sw) + '/>'; }
+  function el(cx, cy, rx, ry) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '"/>'; }
+  function R(x, y, w, h, rx, fill, sw) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + rx + '" fill="' + fill + '"' + sk(sw) + '/>'; }
+  function hi(x, y, rx, ry, rot, op) {
+    return '<ellipse cx="' + x + '" cy="' + y + '" rx="' + rx + '" ry="' + ry + '"' + (rot ? ' transform="rotate(' + rot + ' ' + x + ' ' + y + ')"' : '') + ' fill="#fff" opacity="' + (op || 0.6) + '"/>';
   }
-  function marks(lines, color, w, op) {
-    return '<path d="' + lines + '" stroke="' + (color || '#3a1606') + '" stroke-width="' + (w || 2.2) + '" stroke-linecap="round" opacity="' + (op || 0.5) + '" fill="none"/>';
+  function ln(d, color, w, op, ex) {
+    return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="' + (w || 3.2) + '" stroke-linecap="round" stroke-linejoin="round"' + (op ? ' opacity="' + op + '"' : '') + (ex || '') + '/>';
   }
-  function leaf(x, y, rot, s, c) {
-    return g(x, y, rot, '<path d="M0 0 C' + (2 * s) + ' ' + (-2 * s) + ' ' + (5 * s) + ' ' + (-2 * s) + ' ' + (7 * s) + ' 0 C' + (5 * s) + ' ' + (2 * s) + ' ' + (2 * s) + ' ' + (2 * s) + ' 0 0Z" fill="' + (c || '#4f9d2d') + '" stroke="#2b6a17" stroke-width=".6"/>');
+  function star(n, ro, ri, sy) {
+    var d = '';
+    for (var i = 0; i < n * 2; i++) {
+      var a = Math.PI * i / n - Math.PI / 2, r = i % 2 ? ri : ro;
+      d += (i ? 'L' : 'M') + f(Math.cos(a) * r) + ' ' + f(Math.sin(a) * r * (sy || 1));
+    }
+    return d + 'Z';
   }
+  function ell(rx, ry) { return 'M' + (-rx) + ' 0A' + rx + ' ' + ry + ' 0 1 0 ' + rx + ' 0A' + rx + ' ' + ry + ' 0 1 0 ' + (-rx) + ' 0Z'; }
 
+  // Short wooden handle below the food (y 100..118), optional small pointed tip above it.
   function wrap(inner, defs, stickTop) {
-    var top = stickTop === undefined ? 2 : stickTop;
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 132">' +
-      '<defs>' + lg('stk', [[0, '#a96d34'], [0.45, '#f3d095'], [1, '#9c6630']], 0, 0, 1, 0) +
-      '<filter id="ds" x="-30%" y="-10%" width="160%" height="130%"><feDropShadow dx="1.3" dy="2.4" stdDeviation="1.3" flood-color="#1a0800" flood-opacity=".42"/></filter>' +
-      defs + '</defs><g filter="url(#ds)">' +
-      '<path d="M30 ' + top + ' L32.4 ' + (top + 8) + ' L32.4 126 Q30 129.5 27.6 126 L27.6 ' + (top + 8) + ' Z" fill="url(#stk)" stroke="#7a4a1e" stroke-width=".8"/>' +
+    var t = stickTop === undefined ? 1 : stickTop;
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 120">' +
+      '<defs><filter id="ds" filterUnits="userSpaceOnUse" x="-4" y="-4" width="68" height="128"><feDropShadow dx="1" dy="1.8" stdDeviation="1" flood-color="#1a0800" flood-opacity=".4"/></filter>' + defs + '</defs>' +
+      '<g filter="url(#ds)">' +
+      P('M30 ' + t + 'L33.8 ' + (t + 9) + 'V112Q33.8 117.6 30 117.6Q26.2 117.6 26.2 112V' + (t + 9) + 'Z', '#e8b468', 2.2) +
+      ln('M31.8 ' + (t + 11) + 'V112', '#b8793a', 2) +
       inner + '</g></svg>';
   }
 
   // ---------- 14 skewers ----------
   var S = [];
 
-  // 0 Shashlik: meat chunks with red onion
+  // 0 Beef kebab: dark brown cubes, red pepper, white onion
   S[0] = function () {
-    var defs = rg('m', [[0, '#e0904f'], [0.5, '#a9521f'], [1, '#64270c']], 0.4, 0.35, 0.75) +
-      lg('on', [[0, '#fbeefa'], [1, '#dcaad6']]);
-    function chunk(cy, rot) {
-      return g(30, cy, rot,
-        '<path d="M-16 -7 C-17 -12 -9 -12.5 -2 -11.5 C6 -12.5 15 -12 16.5 -6 C18 0 17 7 14 10 C8 12.5 -6 12 -12 10.5 C-17.5 9 -18 -1 -16 -7 Z" fill="url(#m)" stroke="#45190a" stroke-width="1.4"/>' +
-        marks('M-11 -7 L-5 7 M-1 -9 L5 7 M8 -9 L13 3', '#2e1104', 2.6, 0.55) +
-        shine(-7, -6.5, 5, 2, 0.3) +
-        '<circle cx="9" cy="4" r="1.1" fill="#5aa832"/><circle cx="-9" cy="3" r=".9" fill="#5aa832"/>');
+    var defs = cel('m', '#b8693c', '#8c4321', '#55250e') + cel('p', '#ff7462', '#e8262b', '#a0111a') + cel('o', '#fff', '#f6eee0', '#d3bfa2');
+    function meat(cy, rot) {
+      return g(30, cy, rot, P('M-21 -10.5C-11 -12 9 -11.5 20.5 -10.8Q25 -10.5 24.6 -6C25.6 -1 25.2 3.5 24.2 7.5Q23.4 11 19 10.8C8 12 -9 11.6 -20 10.8Q-24.6 10.5 -24.6 6C-25.6 1 -25.2 -3.5 -24.6 -7Q-24.4 -10.4 -21 -10.5Z', 'url(#m)') +
+        ln('M-20 3Q-14 6 -8 2', '#e0a37a', 2.2, 0.55) +
+        ln('M-15 -8.5L-10 8.5M-3 -8.5L2 8.5M9 -8.5L14 8.5', CHAR, 4, 0.6) + hi(-15, -5.5, 5.5, 2.2, -8, 0.4) + hi(18, -5, 1.7, 1.7, 0, 0.45));
     }
-    function onion(cy) {
-      return g(30, cy, 0, '<ellipse rx="15.5" ry="4.4" fill="url(#on)" stroke="#8e3f86" stroke-width="1.7"/><ellipse rx="10" ry="2.3" fill="none" stroke="#b866ad" stroke-width="1"/>');
-    }
-    return wrap(onion(36) + onion(64) + chunk(22, -6) + chunk(50, 5) + chunk(78, -3) +
-      leaf(14, 86, -30, 1.3) + leaf(44, 60, 20, 1.1), defs);
+    function pep(cy, rot) { return g(30, cy, rot, R(-22, -5, 44, 10, 4, 'url(#p)') + ln('M-15 -2H8', '#fff', 2.4, 0.75)); }
+    function oni(cy) { return g(30, cy, 0, R(-23, -5, 46, 10, 5, 'url(#o)') + ln('M-17 .8H17', '#c9b393', 2, 0.9)); }
+    return wrap(meat(12.5, -3) + pep(29, 3) + meat(45.5, 3) + oni(62) + meat(78.5, -2) + pep(95, -2), defs);
   };
 
-  // 1 Chicken & leek
+  // 1 Chicken: golden-orange rounded chunks with green pepper
   S[1] = function () {
-    var defs = rg('ch', [[0, '#ffe08f'], [0.45, '#eda243'], [1, '#b0601b']], 0.42, 0.38, 0.72) +
-      lg('lk', [[0, '#f1fbdc'], [0.45, '#b6dc72'], [1, '#4c8c27']]);
-    function chicken(cy, rot) {
-      return g(30, cy, rot,
-        '<rect x="-15.5" y="-10" width="31" height="20" rx="9" fill="url(#ch)" stroke="#874310" stroke-width="1.4"/>' +
-        marks('M-9 -8 L-4 8 M2 -9 L7 7', '#7a3a0c', 2.2, 0.45) +
-        '<path d="M-11 -4 C-6 -8 3 -8 9 -6" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".55" fill="none"/>' +
-        '<ellipse cx="-6" cy="3" rx="1.2" ry=".7" fill="#fff6dc"/><ellipse cx="4" cy="1" rx="1.2" ry=".7" fill="#fff6dc"/><ellipse cx="10" cy="5" rx="1.2" ry=".7" fill="#fff6dc"/>');
-    }
-    function leek(cy) {
-      return g(30, cy, 0,
-        '<rect x="-13" y="-5.5" width="26" height="11" rx="3" fill="url(#lk)" stroke="#3f7a1f" stroke-width="1.2"/>' +
-        '<ellipse cx="-13" rx="2.2" ry="5.5" fill="#f4fbe6" stroke="#3f7a1f" stroke-width="1"/>' +
-        '<ellipse cx="13" rx="2.2" ry="5.5" fill="#f4fbe6" stroke="#3f7a1f" stroke-width="1"/>' +
-        '<ellipse cx="4" cy="1" rx="3" ry="2" fill="#6b4a12" opacity=".35"/>');
-    }
-    return wrap(leek(35.5) + leek(68.5) + chicken(19, -4) + chicken(52, 4) + chicken(85, -3), defs);
-  };
-
-  // 2 Shrimp
-  S[2] = function () {
-    var defs = lg('sh', [[0, '#ffc2a0'], [0.5, '#ff7a4b'], [1, '#e04a2a']]);
-    function shrimp(cy, rot) {
-      var segs = '';
-      [150, 122, 94, 66, 38].forEach(function (a) {
-        var r = a * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
-        segs += 'M' + (c * 6.5).toFixed(1) + ' ' + (-4 + s * 5.5).toFixed(1) + ' L' + (c * 15.5).toFixed(1) + ' ' + (-4 + s * 14.5).toFixed(1) + ' ';
-      });
-      return g(30, cy, rot,
-        '<path d="M-11 -4 A11 10 0 1 0 11 -4" fill="none" stroke="#97290f" stroke-width="12.6" stroke-linecap="round"/>' +
-        '<path d="M-11 -4 A11 10 0 1 0 11 -4" fill="none" stroke="url(#sh)" stroke-width="10" stroke-linecap="round"/>' +
-        '<path d="' + segs + '" stroke="#ffe0cf" stroke-width="1.2" opacity=".85"/>' +
-        '<path d="M-7 1 A8 6 0 0 0 1 5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"/>' +
-        '<path d="M9 -7 L15 -16 L19 -9 L13 -3 Z" fill="#e8462a" stroke="#97290f" stroke-width="1.1" stroke-linejoin="round"/>' +
-        '<path d="M14 -8 L16 -13" stroke="#ffb59a" stroke-width="1" opacity=".8"/>' +
-        '<circle cx="-12.5" cy="-6.5" r="1.3" fill="#2a0a02"/>' +
-        '<path d="M-14 -9 C-18 -14 -20 -15 -22 -15 M-12 -10 C-14 -16 -15 -18 -17 -19" stroke="#c4462a" stroke-width=".8" fill="none"/>');
-    }
-    return wrap(shrimp(24, -10) + shrimp(52, 8) + shrimp(80, -8), defs);
-  };
-
-  // 3 Corn
-  S[3] = function () {
-    var defs = lg('cn', [[0, '#e8a31a'], [0.5, '#ffe36a'], [1, '#d98f12']], 0, 0, 1, 0) +
-      rg('kn', [[0, '#fff7b8'], [0.55, '#ffd43c'], [1, '#eba417']], 0.4, 0.35, 0.7) +
-      lg('cs', [[0, 'rgba(120,60,0,.35)'], [0.3, 'rgba(120,60,0,0)'], [0.7, 'rgba(120,60,0,0)'], [1, 'rgba(120,60,0,.4)']], 0, 0, 1, 0) +
-      '<clipPath id="cc"><rect x="17" y="10" width="26" height="80" rx="13"/></clipPath>';
-    var k = '';
-    for (var r = 0, y = 11; y < 89; r++, y += 6.1) {
-      for (var x = 15 + (r % 2 ? 3 : 0); x < 44; x += 6) {
-        k += '<rect x="' + x + '" y="' + y.toFixed(1) + '" width="5.3" height="5.5" rx="2.3" fill="url(#kn)" stroke="#d3920f" stroke-width=".5"/>';
-      }
-    }
-    var husk = '<path d="M30 80 C20 88 15 100 18 114 C23 104 27 96 31 90 Z" fill="#d6e79a" stroke="#86a03a" stroke-width="1.1"/>' +
-      '<path d="M30 80 C40 88 45 100 42 112 C37 103 33 96 29 90 Z" fill="#c4dc7e" stroke="#86a03a" stroke-width="1.1"/>' +
-      '<path d="M22 96 C24 100 25 104 25 108 M38 96 C36 100 35 104 35 107" stroke="#9db84f" stroke-width=".8" fill="none"/>';
-    return wrap(husk +
-      '<rect x="17" y="10" width="26" height="80" rx="13" fill="url(#cn)" stroke="#b07208" stroke-width="1.4"/>' +
-      '<g clip-path="url(#cc)">' + k +
-      '<rect x="17" y="10" width="26" height="80" fill="url(#cs)"/>' +
-      '<ellipse cx="35" cy="34" rx="4" ry="3" fill="#7a3d0a" opacity=".4"/><ellipse cx="24" cy="60" rx="3.5" ry="2.5" fill="#7a3d0a" opacity=".38"/><ellipse cx="36" cy="74" rx="3" ry="2.4" fill="#7a3d0a" opacity=".35"/>' +
-      '<path d="M22 18 C21 35 21 55 22 78" stroke="#fffbe0" stroke-width="3" stroke-linecap="round" opacity=".55" fill="none"/>' +
-      '</g><rect x="17" y="10" width="26" height="80" rx="13" fill="none" stroke="#b07208" stroke-width="1.4"/>', defs, 4);
-  };
-
-  // 4 Sausages
-  S[4] = function () {
-    var defs = lg('sg', [[0, '#ffae8a'], [0.35, '#e8603f'], [1, '#8c2614']]);
-    function sausage(cy, rot) {
-      return g(30, cy, rot,
-        '<rect x="-16" y="-8" width="32" height="16" rx="8" fill="url(#sg)" stroke="#6e1b0c" stroke-width="1.4"/>' +
-        '<path d="M-9 -7 L-5 7 M-2 -7.5 L2 7.5 M5 -7.5 L9 7" stroke="#ffd2bb" stroke-width="1.5" stroke-linecap="round" opacity=".85"/>' +
-        marks('M-13 2 L13 2', '#4a1206', 1.6, 0.35) +
-        shine(-6, -4, 7, 1.6, 0.45));
-    }
-    return wrap(sausage(19, -7) + sausage(39, 6) + sausage(59, -5) + sausage(79, 7) + leaf(16, 88, -40, 1.2) + leaf(43, 48, 30, 1), defs);
-  };
-
-  // 5 Grilled veggies
-  S[5] = function () {
-    var defs = rg('tm', [[0, '#ff9c8c'], [0.5, '#ea3326'], [1, '#9c150d']], 0.38, 0.35, 0.7) +
-      lg('yp', [[0, '#fff08a'], [1, '#f2ad0c']]) +
-      rg('zc', [[0, '#f4f7cc'], [0.7, '#d4e08f'], [1, '#b7c86a']], 0.5, 0.5, 0.6);
-    function tomato(cy) {
-      return g(30, cy, 0,
-        '<circle r="11" fill="url(#tm)" stroke="#86100a" stroke-width="1.4"/>' +
-        '<path d="M0 -10 L-4 -13 L-2 -9 L-6 -8 L0 -8 L6 -8 L2 -9 L4 -13 Z" fill="#3f9b2f" stroke="#226015" stroke-width=".7"/>' +
-        shine(-4, -3, 3.5, 2.2, 0.55));
-    }
-    function pepper(cy, rot) {
-      return g(30, cy, rot,
-        '<path d="M-14 -6 C-12 -10 -4 -9 0 -8 C5 -9 12 -10 14 -6 C16 0 14 7 10 8 C4 9 -4 9 -10 8 C-14 7 -16 0 -14 -6 Z" fill="url(#yp)" stroke="#b47a05" stroke-width="1.3"/>' +
-        marks('M-8 -6 L-4 6 M2 -7 L6 6', '#7a4a06', 2, 0.45) + shine(-6, -4, 4, 1.6, 0.5));
-    }
-    function zucchini(cy) {
-      return g(30, cy, 0,
-        '<ellipse rx="14.5" ry="9" fill="url(#zc)" stroke="#2c6417" stroke-width="2.6"/>' +
-        '<ellipse rx="6" ry="3.6" fill="none" stroke="#c2cf7c" stroke-width="1"/>' +
-        '<g fill="#9fae55"><circle cx="-4" cy="-1" r=".8"/><circle cx="4" cy="1" r=".8"/><circle cx="0" cy="3" r=".8"/><circle cx="1" cy="-3" r=".8"/></g>' +
-        marks('M-9 -5 L-4 6 M2 -7 L7 5', '#5a3a0a', 2.2, 0.5));
-    }
-    return wrap(tomato(20) + pepper(40, -5) + zucchini(59) + tomato(79), defs);
-  };
-
-  // 6 Marshmallows
-  S[6] = function () {
-    var defs = lg('mw', [[0, '#c37a2e'], [0.22, '#f3cf98'], [0.5, '#fffaf2'], [0.8, '#fde8d2'], [1, '#d59346']]) +
-      lg('mp', [[0, '#c27a3a'], [0.22, '#f7c4c8'], [0.5, '#ffe1ec'], [0.8, '#fbcadb'], [1, '#d18a55']]) +
-      lg('mt', [[0, '#8f4a12'], [0.3, '#d7913f'], [0.6, '#f2c58a'], [1, '#b8651f']]);
-    function mm(cy, fill, rot) {
-      return g(30, cy, rot,
-        '<rect x="-13" y="-10.5" width="26" height="21" rx="7" fill="url(#' + fill + ')" stroke="#a97240" stroke-width="1.3"/>' +
-        shine(-5, -2, 4, 5, 0.45) +
-        '<ellipse cx="6" cy="-7" rx="3" ry="1.2" fill="#7a3d0d" opacity=".3"/>');
-    }
-    return wrap(mm(21, 'mt', -5) + mm(46, 'mp', 4) + mm(71, 'mw', -3), defs);
-  };
-
-  // 7 Candy apple
-  S[7] = function () {
-    var defs = rg('ap', [[0, '#ff9a90'], [0.35, '#e8212b'], [0.8, '#9e0c17'], [1, '#6a0610']], 0.35, 0.33, 0.75);
-    return wrap(
-      '<path d="M30 25 C24 19 9 20 8.5 37 C8 55 19 67 30 65 C41 67 52 55 51.5 37 C51 20 36 19 30 25 Z" fill="url(#ap)" stroke="#5d0710" stroke-width="1.6"/>' +
-      '<path d="M15 60 C20 66 25 70 30 70 C35 70 40 66 45 60 C41 64 36 66 30 66 C24 66 19 64 15 60 Z" fill="#b10e1a" stroke="#5d0710" stroke-width="1"/>' +
-      '<path d="M18 63 L18 69 Q18 71 19.5 69.5 L20 64 M41 63 L41.5 67 Q42 69 43 67 L43 62" fill="#c4111c" stroke="#5d0710" stroke-width=".6"/>' +
-      '<path d="M16 34 C17 27 22 24 27 25" stroke="#fff" stroke-width="3.6" stroke-linecap="round" opacity=".8" fill="none"/>' +
-      '<circle cx="15.5" cy="40" r="1.8" fill="#fff" opacity=".7"/>' +
-      '<path d="M40 54 C44 50 46 45 46 41" stroke="#ff8a8a" stroke-width="1.8" stroke-linecap="round" opacity=".5" fill="none"/>' +
-      '<path d="M30 25 C30 19 31 15 33.5 12" stroke="#5a3417" stroke-width="2.4" stroke-linecap="round" fill="none"/>' +
-      '<path d="M33 15 C37 9 45 9 48 12 C44 17 37 18 33 15 Z" fill="#4caf3a" stroke="#2d7020" stroke-width="1"/>' +
-      '<path d="M35 14.5 C39 13 43 12 46 12" stroke="#2d7020" stroke-width=".7" fill="none"/>', defs, 46);
-  };
-
-  // 8 Chocolate strawberries
-  S[8] = function () {
-    var defs = rg('sb', [[0, '#ff8f8f'], [0.5, '#e8232d'], [1, '#a00f18']], 0.38, 0.32, 0.75) +
-      lg('cho', [[0, '#7a4224'], [1, '#3b1a0b']]) +
-      '<clipPath id="sbc" clipPathUnits="userSpaceOnUse"><path d="M0 -11 C9 -12 13 -6 12 0 C11 8 4 13 0 14 C-4 13 -11 8 -12 0 C-13 -6 -9 -12 0 -11 Z"/></clipPath>';
-    function berry(cy, rot) {
-      var seeds = '';
-      [[-5, -5], [2, -6], [7, -2], [-8, 0], [-2, -1], [4, 2]].forEach(function (p) {
-        seeds += '<ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx=".8" ry="1.2" fill="#ffe89a"/>';
-      });
-      return g(30, cy, rot,
-        '<path d="M0 -11 C9 -12 13 -6 12 0 C11 8 4 13 0 14 C-4 13 -11 8 -12 0 C-13 -6 -9 -12 0 -11 Z" fill="url(#sb)" stroke="#7a0a10" stroke-width="1.3"/>' + seeds +
-        '<path clip-path="url(#sbc)" d="M-14 3 Q-10 0 -6 3 T2 3 T10 3 T18 3 V16 H-14 Z" fill="url(#cho)"/>' +
-        '<path d="M-8 6 L-3 9.5 L2 5.5 L7 9" stroke="#fff2df" stroke-width="1.1" fill="none" stroke-linecap="round"/>' +
-        '<path d="M0 -14 L-7 -15 L-3 -10.5 L-9 -8 L0 -9 L9 -8 L3 -10.5 L7 -15 Z" fill="#3e9b3a" stroke="#22621f" stroke-width=".8" stroke-linejoin="round"/>' +
-        shine(-5, -5, 2.5, 1.6, 0.5));
-    }
-    return wrap(berry(22, -6) + berry(50, 5) + berry(78, -4), defs);
-  };
-
-  // 9 Lula kebab
-  S[9] = function () {
-    var defs = lg('lu', [[0, '#5b240b'], [0.35, '#b3602e'], [0.65, '#8c4019'], [1, '#4f1e08']], 0, 0, 1, 0);
-    var d = 'M30 11 C37 11 41 14 41 20';
-    for (var y = 20; y < 84; y += 16) d += ' Q43.5 ' + (y + 8) + ' 41 ' + (y + 16);
-    d += ' C41 90 37 93 30 93 C23 93 19 90 19 84';
-    for (var y2 = 84; y2 > 20; y2 -= 16) d += ' Q16.5 ' + (y2 - 8) + ' 19 ' + (y2 - 16);
-    d += ' C19 14 23 11 30 11 Z';
-    var herbs = '';
-    [[24, 24, 30], [35, 31, -20], [27, 45, 60], [33, 57, 10], [23, 66, -40], [36, 74, 45], [28, 84, 0], [31, 18, 80]].forEach(function (h) {
-      herbs += '<ellipse cx="' + h[0] + '" cy="' + h[1] + '" rx="1.8" ry=".9" transform="rotate(' + h[2] + ' ' + h[0] + ' ' + h[1] + ')" fill="#62b03c"/>';
-    });
-    [[31, 38], [25, 54], [35, 66], [29, 77]].forEach(function (p) { herbs += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r=".9" fill="#e0401f"/>'; });
-    return wrap(
-      '<path d="' + d + '" fill="url(#lu)" stroke="#3a1505" stroke-width="1.4"/>' +
-      marks('M21 30 L39 23 M21 48 L39 41 M21 66 L39 59 M21 84 L38 78', '#2a0d02', 3, 0.55) +
-      '<path d="M23 17 C22 35 22 60 23 86" stroke="#ffd2a8" stroke-width="2.2" stroke-linecap="round" opacity=".3" fill="none"/>' +
-      herbs + leaf(36, 12, -60, 1.3) + leaf(22, 13, -130, 1.1), defs);
-  };
-
-  // 10 Mushrooms
-  S[10] = function () {
-    var defs = rg('mu', [[0, '#f1d7b2'], [0.55, '#c2915f'], [1, '#7b5030']], 0.42, 0.3, 0.8);
-    function shroom(cy, rot) {
-      return g(30, cy, rot,
-        '<rect x="-5" y="2" width="10" height="9" rx="3.5" fill="#f6ead6" stroke="#8a6440" stroke-width=".9"/>' +
-        '<path d="M-14 3 C-8 7 8 7 14 3 L13 5 C7 9 -7 9 -13 5 Z" fill="#efdcbf" stroke="#8a6440" stroke-width=".9"/>' +
-        '<path d="M-15.5 3 C-15.5 -9 -7 -13.5 0 -13.5 C7 -13.5 15.5 -9 15.5 3 C9 6 -9 6 -15.5 3 Z" fill="url(#mu)" stroke="#5e3a1f" stroke-width="1.3"/>' +
-        marks('M-8 -9 L-5 2 M1 -11 L4 2 M9 -8 L10 0', '#4a2a10', 2, 0.45) +
-        shine(-6, -7, 4, 2, 0.45));
-    }
-    return wrap(shroom(23, -6) + shroom(50, 6) + shroom(77, -4) + leaf(17, 88, -35, 1.2) + leaf(42, 63, 25, 1), defs);
-  };
-
-  // 11 Salmon with lemon
-  S[11] = function () {
-    var defs = lg('sa', [[0, '#ffb98a'], [0.5, '#ff8152'], [1, '#df5730']], 0, 0, 1, 1) +
-      lg('le', [[0, '#fff6a8'], [1, '#ffd21f']]);
-    function salmon(cy, rot) {
-      return g(30, cy, rot,
-        '<rect x="-14.5" y="-10" width="29" height="20" rx="5" fill="url(#sa)" stroke="#a83a18" stroke-width="1.3"/>' +
-        '<path d="M-10 -9 C-5 -4 -5 3 -9 9 M-2 -9.5 C3 -4 3 3 -1 9.5 M6 -9.5 C11 -4 11 3 7 9.5" stroke="#ffe9dc" stroke-width="1.5" fill="none" opacity=".9"/>' +
-        marks('M-12 -3 L12 -6 M-12 5 L12 2', '#7a2a0a', 1.8, 0.35) +
-        '<path d="M6 -5 l2 -2 m-2 2 l-1 -3 m1 3 l3 1" stroke="#3d8f2a" stroke-width=".8" fill="none"/>');
-    }
-    function lemon(cy) {
-      return g(30, cy, 0,
-        '<ellipse rx="14.5" ry="4.6" fill="url(#le)" stroke="#c69400" stroke-width="1.4"/>' +
-        '<path d="M-9 0 H9 M-5 -3 L5 3 M-5 3 L5 -3" stroke="#fffbe0" stroke-width=".9" opacity=".9"/>');
-    }
-    return wrap(lemon(35) + lemon(65) + salmon(20, -4) + salmon(50, 4) + salmon(80, -3), defs);
-  };
-
-  // 12 Eggplant
-  S[12] = function () {
-    var defs = lg('eg', [[0, '#8a4bb0'], [0.5, '#5a2477'], [1, '#34104a']]);
+    var defs = cel('c', '#ffd772', '#f6a32a', '#c25f0f') + cel('gp', '#94e260', '#4cbf2e', '#2a7d1e');
+    var ch = 'M-23 -5C-25 -12 -13 -13 -4 -11.5C6 -13.5 21 -13 23.5 -5C26 2.5 23 11 14 12C4 13.5 -10 13.5 -17.5 11.5C-25 9.5 -25.5 1 -23 -5Z';
     function chunk(cy, rot) {
-      return g(30, cy, rot,
-        '<path d="M-15 5 C-15 -6 -8 -10 0 -10 C8 -10 15 -6 15 5 C9 9.5 -9 9.5 -15 5 Z" fill="url(#eg)" stroke="#260836" stroke-width="1.4"/>' +
-        '<path d="M-14.5 3.5 C-8 7.5 8 7.5 14.5 3.5 L14.8 5.2 C9 9.5 -9 9.5 -14.8 5.2 Z" fill="#f1e2b6" stroke="#8a6a3a" stroke-width=".8"/>' +
-        '<path d="M-9 -7 C-5 -9 2 -9 6 -8" stroke="#e6c8ff" stroke-width="2" stroke-linecap="round" opacity=".55" fill="none"/>' +
-        marks('M-6 -6 L-3 6 M4 -7 L7 5', '#1a0426', 2, 0.45));
+      return g(30, cy, rot, P(ch, 'url(#c)') + ln('M-14 -9L-9 9M-1 -10L4 10M12 -9L16 5', '#6e2b06', 3.8, 0.55) +
+        hi(-12, -5.5, 6, 2.6, -10, 0.6) + '<g fill="#2f7d22">' + el(-5, 5, 1.9, 1.2) + el(8, 1, 1.9, 1.2) + el(17, -3, 1.6, 1.1) + '</g>');
     }
-    return wrap(chunk(19, -5) + chunk(39, 4) + chunk(59, -4) + chunk(79, 5) +
-      '<g fill="#5fb03a"><circle cx="22" cy="30" r="1"/><circle cx="37" cy="47" r="1"/><circle cx="26" cy="68" r="1"/><circle cx="35" cy="86" r="1"/></g>', defs);
+    function gp(cy, rot) {
+      return g(30, cy, rot, P('M-20 -4.5Q-20 -6.5 -17 -6.5L17 -5.5Q20 -5.5 20 -2.5L19 4.5Q19 6.5 16 6.5L-17 5.5Q-20 5.5 -20 2.5Z', 'url(#gp)') + ln('M-13 -2.5H9', '#e6ffc8', 2.4, 0.75));
+    }
+    return wrap(gp(33.5, 3) + gp(69.5, -3) + chunk(15.5, -4) + chunk(51, 4) + chunk(86.5, -2), defs);
   };
 
-  // 13 Potato with salo
+  // 2 Shrimp: glossy coral C-shaped curls, thick head tapering to a fan tail
+  S[2] = function () {
+    var rx = 16, ry = 10.5, N = 14, o = [], n = [], segs = '', hl = [];
+    // point on the curled body: s 0 = tail .. 1 = head, side -1 inner edge .. +1 outer edge
+    function at(s, side) {
+      var th = (-45 - 270 * s) * Math.PI / 180, w = 8 + 9 * Math.pow(s, 0.7);
+      return [(rx + side * w / 2) * Math.cos(th), (ry + side * w / 2) * Math.sin(th)];
+    }
+    function xy(p) { return f(p[0]) + ' ' + f(p[1]); }
+    for (var i = 0; i <= N; i++) { o.push(xy(at(i / N, 1))); n.unshift(xy(at(i / N, -1))); }
+    var he = at(1, 1), hn = at(1, -1), tx = 8.4, ty = -5.5;
+    var body = 'M' + o.join('L') + 'C' + f(he[0] + tx) + ' ' + f(he[1] + ty) + ' ' + f(hn[0] + tx) + ' ' + f(hn[1] + ty) + ' ' + n.join('L') + 'Z';
+    [0.26, 0.42, 0.58, 0.74].forEach(function (s) { segs += 'M' + xy(at(s, -0.55)) + 'L' + xy(at(s, 0.7)); });
+    [0.06, 0.18, 0.3, 0.42, 0.54].forEach(function (s) { hl.push(xy(at(s, 0.42))); });
+    var ey = at(0.92, 0.2), gl = at(0.68, 0.45), t0 = at(0, 0);
+    var defs = cel('sh', '#ffb69c', '#ff8466', '#dc5038', 0.7) + cel('tl', '#ff9a7a', '#ff6242', '#d03c22') +
+      '<g id="sp">' + g(f(t0[0] + 1), f(t0[1]), -20, P('M-1 -3.5L10 -10Q14.5 -4.5 11 0Q14.5 4.5 10 10L-1 3.5Z', 'url(#tl)', 2.4) + ln('M2 0H9', '#c33a20', 2, 0.7)) +
+      P(body, 'url(#sh)') + ln(segs, '#cf4229', 2.6, 0.85) + ln('M' + hl.join('L'), '#fff', 3, 0.75) +
+      hi(f(gl[0]), f(gl[1]), 1.8, 1.8, 0, 0.8) +
+      '<circle cx="' + f(ey[0]) + '" cy="' + f(ey[1]) + '" r="2.6" fill="' + OL + '"/>' + hi(f(ey[0] - 0.8), f(ey[1] - 0.8), 0.8, 0.8, 0, 0.9) + '</g>';
+    function one(cx, cy, rot, sx) { return g(cx, cy, rot, '<use href="#sp"/>', sx); }
+    return wrap(one(29, 18, -4) + one(31, 50, 5, -1) + one(29, 82, -4), defs);
+  };
+
+  // 3 Corn: single yellow cob with kernel grid, char spots, green husk at the bottom
+  S[3] = function () {
+    var cob = 'M10 24C10 9 19 2 30 2C41 2 50 9 50 24V72C50 84 41 90 30 90C19 90 10 84 10 72Z';
+    var defs = '<pattern id="k" width="6.2" height="6.6" patternUnits="userSpaceOnUse" x="1" y="0"><rect x=".5" y=".5" width="5.2" height="5.6" rx="2.2" fill="#ffd83a"/><rect x="1.2" y="1.2" width="2.4" height="2.2" rx="1" fill="#fff4a8"/></pattern>' +
+      lg('cs', [[0, '#fff', 0.3], [0.3, '#fff', 0], [0.64, '#fff', 0], [0.64, '#9a4300', 0.32], [1, '#8a3a00', 0.42]], 0, 0, 1, 0) +
+      cel('hk', '#9be060', '#62b834', '#3a8a22') + cel('hf', '#c0ec84', '#8fd456', '#5aa236');
+    return wrap(
+      P(cob, '#d88c0c') + P(cob, 'url(#k)', 0) +
+      '<g fill="#5a2600" opacity=".45">' + el(37, 27, 4.5, 3.5) + el(19, 50, 4, 3.5) + el(38, 62, 4.5, 3.2) + el(24, 14, 3, 2.4) + '</g>' +
+      P(cob, 'url(#cs)', 0) + hi(17.5, 32, 3.2, 14, 0, 0.6) + P(cob, 'none') +
+      P('M31 100C17 98 6 85 3 58C11 66 21 73 30 81Z', 'url(#hk)') + ln('M27 95C18 90 11 81 7 68', '#c4f08a', 2, 0.8) +
+      P('M29 100C43 98 54 85 57 58C49 66 39 73 30 81Z', 'url(#hk)') + ln('M33 95C42 90 49 81 53 68', '#2f7a1c', 2, 0.6) +
+      P('M30 101C21 96 20 82 27 66C33 75 38 84 37 92C36 97 33 100 30 101Z', 'url(#hf)'), defs, 0);
+  };
+
+  // 4 Sausage: one long bent red-brown tube with diagonal cuts
+  S[4] = function () {
+    var p0 = [23, 20.5], p1 = [43, 51], p2 = [23, 81.5], c = 'M23 20.5Q43 51 23 81.5', cuts = '';
+    for (var i = 0; i < 5; i++) {
+      var t = 0.14 + i * 0.18, u = 1 - t;
+      var x = u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], y = u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1];
+      var a = Math.atan2(2 * u * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]), 2 * u * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0])) * 180 / Math.PI;
+      cuts += g(f(x + 0.5), f(y), f(a + 60), ln('M-8.5 0H8.5', '#4a1205', 6.2) + ln('M-7.5 -.9H7.5', '#ffbf96', 2.8));
+    }
+    return wrap(ln(c, OL, 37.5) + ln(c, '#8a2b16', 32) + ln(c, '#c9502c', 25, 0, ' transform="translate(-2.8 -1)"') +
+      ln(c, '#e8784c', 11, 0, ' transform="translate(-7 -2)"') + cuts +
+      ln('M15.5 34Q20 50 16.5 64', '#fff', 3.6, 0.6) + hi(41, 52, 1.6, 4, 0, 0.35), '');
+  };
+
+  // 5 Veggies: glossy red cherry tomatoes and grilled zucchini rounds
+  S[5] = function () {
+    var defs = cel('t', '#ff7a66', '#ec2f27', '#a3150e') + cel('zf', '#fbffd6', '#e8f0a6', '#c9d67f') +
+      cel('zs', '#58b844', '#2f8a2a', '#1b5e1e') + cel('lv', '#7ad35a', '#45b83a', '#2b8526');
+    function tom(cy) {
+      return g(30, cy, 0, E(0, 0, 16.5, 14, 'url(#t)') + hi(-7, -5.5, 5, 3, -30, 0.85) + hi(8.5, 5, 1.7, 1.7, 0, 0.55) +
+        P(star(5, 7.5, 2.8, 0.6), 'url(#lv)', 2, ' transform="translate(0 -11.5)"'));
+    }
+    function zuc(cy, rot) {
+      return g(30, cy, rot, E(0, 2.5, 25, 10, 'url(#zs)') + E(0, -1.5, 25, 8, 'url(#zf)') +
+        E(0, -1.5, 15, 4, 'none', 0).replace('/>', ' stroke="#c4d16a" stroke-width="2.2"/>') +
+        ln('M-14 -6L-11 3M-2 -7.5L1 4M10 -6.5L13 2', '#4a3006', 3.6, 0.5));
+    }
+    return wrap(tom(17) + zuc(41.5, -4) + tom(66.5) + zuc(88.5, 4), defs);
+  };
+
+  // 6 Marshmallows: white puffy pillows with toasted golden edges
+  S[6] = function () {
+    var defs = '<radialGradient id="mt" cx=".42" cy=".4" r=".68">' + stops([[0, '#fffdf8'], [0.42, '#fff5e6'], [0.62, '#f8d290'], [0.8, '#de953f'], [1, '#9a4f16']]) + '</radialGradient>';
+    var b = 'M-17 -10.5C-6 -12 6 -12 17 -10.5Q23 -10 22.5 -5C24 -2 24 2 22.5 5Q23 10 17 10.5C6 12 -6 12 -17 10.5Q-23 10 -22.5 5C-24 2 -24 -2 -22.5 -5Q-23 -10 -17 -10.5Z';
+    function mm(cy, rot) { return g(30, cy, rot, P(b, 'url(#mt)') + E(13, 6.5, 6, 2.6, '#c9772c', 0).replace('/>', ' opacity=".55"/>') + hi(-12, -5, 4, 1.6, -8, 0.9)); }
+    return wrap(mm(13.8, -5) + mm(38.3, 4) + mm(62.8, -3) + mm(87.3, 5), defs);
+  };
+
+  // 7 Candy apple: one big glossy red sphere, caramel cap with drips, caramel foot, leaf
+  S[7] = function () {
+    var ap = 'M30 30C20 21 3 24 3 52C3 80 17 96 30 93C43 96 57 80 57 52C57 24 40 21 30 30Z';
+    var defs = cel('a', '#ff5a60', '#e01b2b', '#930c19', 0.7) + cel('cr', '#ffd27a', '#f2a630', '#c47212', 0.7) +
+      cel('lf', '#8fe060', '#5cc23c', '#2f8a25') + '<clipPath id="ac"><path d="' + ap + '"/></clipPath>';
+    var d = 'M0 0H60V42';
+    [[49, 7, 4], [38, 14, 4.5], [25, 19, 4.5], [13, 10, 4]].forEach(function (q) {
+      d += 'H' + (q[0] + q[2]) + 'V' + (42 + q[1]) + 'A' + q[2] + ' ' + q[2] + ' 0 0 1 ' + (q[0] - q[2]) + ' ' + (42 + q[1]) + 'V42';
+    });
+    d += 'H0Z';
+    return wrap(
+      P(ap, 'url(#a)') +
+      '<g clip-path="url(#ac)">' + P(d, '#f2a630', 2.4) + ln('M8 38Q14 33 22 33', '#ffe2a0', 3, 0.8) + '</g>' + P(ap, 'none') +
+      P('M15 89Q30 98 45 89Q49 95 42 99.5H18Q11 95 15 89Z', 'url(#cr)', 2.4) +
+      hi(11.5, 64, 3.6, 10, 18, 0.85) + hi(14.5, 81, 2, 2, 0, 0.75) + hi(47, 74, 2.4, 6, -25, 0.3) +
+      ln('M30 31Q30 20 33 11', OL, 7.4) + ln('M30 31Q30 20 33 11', '#7a4420', 3.4) +
+      P('M33 16C36 7 46 5 52 9C48 16 40 19 33 16Z', 'url(#lf)', 2.4) + ln('M35 15Q43 11 49 9', '#2f7a22', 1.6), defs, 70);
+  };
+
+  // 8 Chocolate strawberries: glossy red berries, green tops, chocolate-dipped bottoms
+  S[8] = function () {
+    var B = 'M0 -11.5C12.5 -15 21 -8 20 0C19.5 9 9 16.5 0 19C-9 16.5 -19.5 9 -20 0C-21 -8 -12.5 -15 0 -11.5Z';
+    var defs = cel('sb', '#ff7884', '#f5293d', '#ad1020') + cel('ck', '#8f4e28', '#6b3518', '#3c1c0a') + cel('lv', '#7ad35a', '#45b83a', '#2b8526') +
+      '<clipPath id="bc"><path d="' + B + '"/></clipPath>';
+    var seeds = '<g fill="#ffe27a">';
+    [[-12, -5], [-4, -8], [4, -8], [12, -5], [-7, -1.5], [1, -2.5], [8, -1]].forEach(function (p) { seeds += '<ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx="1.2" ry="1.9"/>'; });
+    defs += '<g id="sw">' + P(B, 'url(#sb)') + seeds + '</g>' +
+      '<g clip-path="url(#bc)">' + P('M-23 3Q-17.5 -1 -11.5 3T0 3T11.5 3T23 3V22H-23Z', 'url(#ck)', 2.4) +
+      ln('M-16 10L-9 13.5L-2 9L5 13.5L12 9L18 12', '#fff3e0', 2.4, 0.9) + '</g>' + P(B, 'none') +
+      hi(-10, -6, 3.6, 2, -25, 0.8) + hi(12.5, -5.5, 1.4, 1.4, 0, 0.6) +
+      P(star(5, 11, 4, 0.55), 'url(#lv)', 2.2, ' transform="translate(0 -12.5)"') + '</g>';
+    function berry(cy, rot) { return g(30, cy, rot, '<use href="#sw"/>'); }
+    return wrap(berry(20.5, -6) + berry(50.8, 6) + berry(81, -5), defs);
+  };
+
+  // 9 Broccoli: two big vivid green bumpy florets (tree silhouettes) on pale stems
+  S[9] = function () {
+    var defs = cel('b', '#8ae462', '#3fbf3a', '#22852a', 0.7) + cel('st', '#dcf3a8', '#b5df78', '#7fb24a');
+    var o = '', fi = '';
+    [[-14, -6, 10], [14, -6, 10], [-8, -15, 10], [8, -15, 10], [0, -5, 11], [0, -18, 8]].forEach(function (b) {
+      o += '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + (b[2] + 2.8) + '"/>';
+      fi += '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] + '"/>';
+    });
+    defs += '<g id="fl">' + P('M-7.5 2L-5.5 19Q0 22 5.5 19L7.5 2Z', 'url(#st)', 2.6) + ln('M-2 8V17', '#fff', 2, 0.5) +
+      '<g fill="' + OL + '">' + o + '</g><g fill="url(#b)">' + fi + '</g>' +
+      hi(-11, -19, 3.4, 2, -20, 0.5) + hi(-18, -9, 2.6, 1.6, -30, 0.45) + hi(3, -23, 2.4, 1.4, -10, 0.45) + hi(-3, -8, 2.6, 1.6, -20, 0.4) + '</g>';
+    return wrap(g(30, 31, -4, '<use href="#fl"/>') + g(30, 80, 4, '<use href="#fl"/>'), defs);
+  };
+
+  // 10 Mushrooms: beige-brown grilled domed caps on cream stems
+  S[10] = function () {
+    var defs = cel('mu', '#e4b78a', '#c48a58', '#8a5733') + cel('ms', '#fffaf0', '#f3e6cc', '#d4bc94');
+    defs += '<g id="mu1">' + P('M-8 1L-7 15.5Q0 18.5 7 15.5L8 1Z', 'url(#ms)', 2.6) + E(0, 2.5, 21, 4, '#e3cba2', 2.4) +
+      P('M-25 1C-25.5 -10 -14 -16 0 -16C14 -16 25.5 -10 25 1C17 5 -17 5 -25 1Z', 'url(#mu)') +
+      ln('M-12 -12L-9 1M1 -14L3.5 2M13 -11L15 -1', CHAR, 3.6, 0.5) + hi(-12, -8, 5.5, 2.4, -20, 0.6) + hi(19, -5, 1.4, 1.4, 0, 0.5) + '</g>';
+    function sh(cy, rot) { return g(30, cy, rot, '<use href="#mu1"/>'); }
+    return wrap(sh(18, -5) + sh(50, 5) + sh(82, -4), defs);
+  };
+
+  // 11 Blueberries: cluster of glossy blue berries with dark crowns
+  S[11] = function () {
+    var defs = cel('bb', '#7c95f2', '#3b5bdb', '#243a9a') + '<g id="be"><circle r="11" fill="url(#bb)"' + sk(2.6) + '/>' +
+      hi(-4.5, -4.5, 3.2, 2.1, -30, 0.85) + hi(5.5, 4.5, 1.2, 1.2, 0, 0.5) +
+      '<path d="' + star(5, 3.8, 1.6) + '" transform="translate(1.5 -1)" fill="#1a256a"/></g>';
+    var out = '';
+    for (var i = 0; i < 7; i++) {
+      var y = 13 + i * 12.67, xs = i % 2 ? [19, 43] : [17.5, 41.5];
+      xs.forEach(function (x, j) { out += '<use href="#be" x="' + x + '" y="' + f(y + j * 2) + '"/>'; });
+    }
+    return wrap(out, defs);
+  };
+
+  // 12 Eggplant: green-capped stem end plus grilled purple oval slices with a pale flesh rim
+  S[12] = function () {
+    var defs = cel('eg', '#b46ee6', '#8b3fc8', '#55188a', 0.7) + cel('fl', '#fffbe6', '#f1e6bf', '#d5c592') + cel('lv', '#8ad860', '#5cbf3a', '#2f8a25');
+    defs += '<g id="es">' + E(0, 0, 25, 11.5, 'url(#fl)') + '<ellipse cy="2.2" rx="23.3" ry="9" fill="url(#eg)"/>' +
+      ln('M-13 -2.5L-9.5 8.5M0 -3.5L3.5 9.5M13 -2.5L15.5 6.5', '#250838', 3.6, 0.55) + hi(-13, 0.5, 5.5, 2, -8, 0.5) + '</g>';
+    var end = g(30, 17, -6, E(0, 3, 21, 11.5, 'url(#eg)') + hi(-10, 4, 4.5, 2.2, -15, 0.5) +
+      P('M-2.5 -5L-1.5 -14Q0 -15.5 2 -14L3 -5Z', '#4a9a2c', 2.2) +
+      P('M-16 -2Q0 -12 16 -2L13 4.5L8.5 0L3.5 6.5L-1 0L-6 5.5L-10.5 0L-14 4.5Z', 'url(#lv)', 2.2));
+    function sl(cy, rot) { return g(30, cy, rot, '<use href="#es"/>'); }
+    return wrap(end + sl(43.5, 6) + sl(66, -6) + sl(88.5, 6), defs);
+  };
+
+  // 13 Donut: hot pink glossy glazed rings with sprinkles
   S[13] = function () {
-    var defs = rg('po', [[0, '#fbe0a0'], [0.55, '#dca44d'], [1, '#9c6125']], 0.4, 0.35, 0.7) +
-      lg('sl', [[0, '#c4683e'], [0.15, '#fff6ec'], [0.4, '#fbeee4'], [0.55, '#e8808a'], [0.75, '#fae6dd'], [1, '#b9573a']]);
-    function potato(cy, rot) {
-      return g(30, cy, rot,
-        '<ellipse rx="12.5" ry="11.5" fill="url(#po)" stroke="#734312" stroke-width="1.4"/>' +
-        '<g fill="#8a5a24" opacity=".6"><circle cx="5" cy="-5" r="1"/><circle cx="-6" cy="4" r=".9"/><circle cx="6" cy="6" r=".8"/></g>' +
-        marks('M-7 -7 L-2 8 M2 -9 L7 6', '#5a2f08', 2.1, 0.45) +
-        shine(-5, -4.5, 3.5, 2.2, 0.45) +
-        '<path d="M-2 -1 l2 -2 m-2 2 l-2 -1" stroke="#3d8f2a" stroke-width=".9" fill="none"/>');
+    var defs = cel('dg', '#ffd9a0', '#eeb064', '#bf7a36') + cel('gl', '#ff9ad0', '#ff4fae', '#d42684', 0.7);
+    var gz = '';
+    for (var i = 0; i < 48; i++) {
+      var a = i / 48 * Math.PI * 2, k = 1 + 0.05 * Math.sin(a * 7) + 0.03 * Math.sin(a * 3 + 1) +
+        0.14 * Math.exp(-Math.pow(a - 1.2, 2) / 0.02) + 0.11 * Math.exp(-Math.pow(a - 2.1, 2) / 0.02);
+      gz += (i ? 'L' : 'M') + f(Math.cos(a) * 22 * k) + ' ' + f(Math.sin(a) * 19.5 * k);
     }
-    function salo(cy) {
-      return g(30, cy, 0,
-        '<path d="M-15 -4 Q-7.5 -6.5 0 -4 T15 -4 L15 4 Q7.5 6.5 0 4 T-15 4 Z" fill="url(#sl)" stroke="#9a4a26" stroke-width="1.2"/>');
-    }
-    return wrap(salo(36) + salo(66) + potato(21, -5) + potato(51, 6) + potato(81, -3), defs);
+    gz += 'Z' + ell(10, 8.8);
+    var cols = ['#fff27a', '#5ad7ff', '#fff', '#7cf06a', '#fff27a', '#fff', '#5ad7ff', '#ffb21e', '#7cf06a', '#fff'], spr = '';
+    cols.forEach(function (c, j) {
+      var a = j / cols.length * Math.PI * 2 + 0.4, r = j % 2 ? 14.5 : 16.5;
+      spr += g(f(Math.cos(a) * r), f(Math.sin(a) * r * 0.88), (j * 47) % 180, ln('M-3 0H3', c, 3.4));
+    });
+    defs += '<g id="dn">' + P(ell(26, 23.5) + ell(7.5, 6.5), 'url(#dg)', 2.8, ' fill-rule="evenodd"') +
+      P(gz, 'url(#gl)', 2.2, ' fill-rule="evenodd"') + spr + ln('M-18 -8Q-13.5 -15 -4 -17', '#fff', 3.4, 0.75) + hi(13, -12.5, 1.8, 1.8, 0, 0.8) + '</g>';
+    return wrap(g(30, 25.5, -4, '<use href="#dn"/>') + g(30, 76.5, 5, '<use href="#dn"/>'), defs);
   };
 
   // ---------- caching to data URLs ----------

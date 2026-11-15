@@ -4,7 +4,7 @@
   'use strict';
 
   var NUM_TYPES = 14;
-  var GEN_VERSION = 3;
+  var GEN_VERSION = 4;
   var MAX_CAP = 7;
 
   // ---------- seeded random ----------
@@ -36,32 +36,81 @@
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
   // ---------- level parameters ----------
+  // Row patterns: G = big grill (3 skewers), S = small grill (1 skewer).
+  // Static rows must fit the board width; conveyor rows are longer than the screen and loop.
+  var POOL_EASY = ['GG', 'GSG', 'SGS'];
+  var POOL_MID = POOL_EASY.concat(['GGG', 'SGGS', 'GSSG', 'GSG']);
+  var POOL_LATE = POOL_MID.concat(['SSGSS', 'SSSSS', 'GGG']);
+  var POOL_CONV = ['GGGG', 'GSGSG', 'GGSGG', 'SGSGSG', 'GGGG'];
+
   function levelParams(n) {
     var hard = n >= 5 && n % 5 === 0;
     var types = Math.min(NUM_TYPES, 3 + Math.ceil(n * 0.55));
-    var triples = n <= 4 ? 4 + 2 * n : Math.min(48, Math.round(12 + (n - 4) * 1.4));
-    var rows = n <= 2 ? 2 : n <= 6 ? 3 : 4;
+    // long levels: 30 skewers on level 1, 75 on level 5, 150 by level 15, up to 300
+    var triples = n <= 3 ? 10 + 5 * (n - 1) : Math.min(100, Math.round(25 + (n - 5) * 2.5));
+    var rowsMin = n <= 1 ? 2 : n <= 3 ? 3 : n <= 6 ? 3 : 4;
+    var rowsMax = n <= 1 ? 2 : n <= 3 ? 3 : n <= 6 ? 4 : 5;
+    if (hard) rowsMin = rowsMax;
+    var pool = n <= 3 ? POOL_EASY : n <= 7 ? POOL_MID : POOL_LATE;
+    // conveyor rows: chance and count grow with the level
+    var conv = { chance: n < 3 ? 0 : n <= 5 ? 0.6 : 0.8, min: n >= 12 ? 1 : 0, max: n < 3 ? 0 : n < 12 ? 1 : 2 };
+    if (hard && n >= 10) conv.min = 2;
+    var speed = 16 + Math.min(16, n * 0.45);
     var plates = 3;
     var chaos = clamp((n - 4) * 0.006, 0, 0.1) + (hard ? 0.05 : 0);
     var band;
     if (n <= 3) band = [0.8, 1.01];
     else if (n <= 8) band = [0.45, 1.01];
     else if (n <= 15) band = [0.25, 0.92];
-    else band = [0.2, 0.8];
+    else band = [0.28, 0.85]; // long levels: the simple simulator plays worse than a person
     if (hard) band = [band[0] * 0.6, band[1] * 0.75];
     var mix = Math.round(clamp(3 + n * 1.3, 3, 70) * (hard ? 1.4 : 1));
-    return { n: n, hard: hard, types: types, triples: triples, rows: rows, plates: plates, cap: 5, chaos: chaos, band: band, mix: mix };
+    return {
+      n: n, hard: hard, types: types, triples: triples, rowsMin: rowsMin, rowsMax: rowsMax, pool: pool,
+      conv: conv, speed: speed, plates: plates, cap: 5, chaos: chaos, band: band, mix: mix
+    };
   }
 
-  var ROW_POOL = ['GSG', 'GSG', 'GSG', 'GG', 'GG', 'GG', 'SGS', 'SGS'];
+  function slotsOf(pat) { var k = 0; for (var i = 0; i < pat.length; i++) k += pat[i] === 'G' ? 3 : 1; return k; }
+
+  // Picks the rows of grills for one level: how many rows, their patterns and which rows move.
+  function pickLayout(P, rng) {
+    var items = P.triples * 3;
+    var best = null;
+    for (var tries = 0; tries < 30; tries++) {
+      var nRows = P.rowsMin + Math.floor(rng() * (P.rowsMax - P.rowsMin + 1));
+      var nConv = 0;
+      if (P.conv.max > 0 && rng() < P.conv.chance) nConv = 1 + Math.floor(rng() * P.conv.max);
+      nConv = Math.max(P.conv.min, Math.min(nConv, P.conv.max, nRows - 1));
+      var order = [];
+      for (var r = 0; r < nRows; r++) order.push(r);
+      var convSet = shuffle(order, rng).slice(0, nConv);
+      var rows = [], info = [], slots = 0;
+      var dir = rng() < 0.5 ? 1 : -1;
+      for (var q = 0; q < nRows; q++) {
+        var isConv = convSet.indexOf(q) >= 0;
+        var pat = isConv ? POOL_CONV[Math.floor(rng() * POOL_CONV.length)] : P.pool[Math.floor(rng() * P.pool.length)];
+        rows.push(pat);
+        info.push(isConv ? { conv: true, dir: dir, speed: Math.round(P.speed * (0.85 + rng() * 0.3)) } : { conv: false });
+        if (isConv) dir = -dir;
+        slots += slotsOf(pat);
+      }
+      var ratio = items / slots;
+      var score = ratio < 1.6 ? 1.6 - ratio : ratio > 9 ? ratio - 9 : 0;
+      if (!best || score < best.score) best = { rows: rows, info: info, score: score };
+      if (score === 0) break;
+    }
+    return best;
+  }
 
   // Builds one candidate layout. Returns a level definition (plain data).
   function buildDef(P, rng, attempt) {
     var items = P.triples * 3;
     var trays = [];
     var rows = [];
-    for (var r = 0; r < P.rows; r++) {
-      var pat = ROW_POOL[Math.floor(rng() * ROW_POOL.length)];
+    var layout = pickLayout(P, rng);
+    for (var r = 0; r < layout.rows.length; r++) {
+      var pat = layout.rows[r];
       var row = [];
       for (var c = 0; c < pat.length; c++) {
         row.push(trays.length);
@@ -150,7 +199,7 @@
     return {
       n: P.n, hard: P.hard, plates: P.plates, cap: P.cap, chaos: P.chaos,
       seed: hash(GEN_VERSION, P.n, attempt, 99),
-      rows: rows,
+      rows: rows, rowInfo: layout.info,
       trays: trays.map(function (t) { return { kind: t.kind, slots: t.slots, layers: t.layers }; }),
       types: types, total: items
     };

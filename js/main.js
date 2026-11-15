@@ -7,7 +7,9 @@
   var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
   // ---------- board geometry (logical px, the board is scaled to fit) ----------
-  var SW = 44, IH = 97, PAD = 5, CG = 2, TGAP = 8, STRIP = 26, ROWG = 14, BW = 370;
+  // cell SW x IH; TOPP leaves room above the cell for the darker skewer of the next layer
+  var SW = 40, IH = 80, PAD = 5, CG = 2, TOPP = 9, TGAP = 7, ROWG = 10, BW = 420;
+  var GH = TOPP + IH + PAD;
   var PRICES = { undo: 20, slot: 40, shuffle: 50, chef: 70 };
   var COIN_PER_ORDER = 2;
   var START_COINS = 150;
@@ -54,12 +56,14 @@
     pause: 'Пауза', resume: 'Продовжити', restart: 'Почати рівень знову', sound: 'Звук', haptics: 'Вібрація', on: 'Увімк.', off: 'Вимк.',
     howto: 'Як грати', ok: 'Зрозуміло', noCoins: 'Не вистачає монет', noUndo: 'Нема що скасувати', maxSlots: 'Більше місць не можна',
     noChef: 'Зараз немає замовлення для кухаря', tutorial: 'Торкнись шашлика, який є в замовленні',
+    locked: 'Спочатку звільни гриль', conveyor: 'Конвеєр! Грилі рухаються',
     b: { undo: 'Назад', slot: '+1 місце', shuffle: 'Перемішати', chef: 'Кухар' },
     rules: [
       'Торкайся шашликів на грилі. Якщо такий шашлик є в замовленні, він полетить на тарілку.',
       'Якщо замовлення немає, шашлик чекає на решітці. На ній лише 5 місць.',
       '3 однакові шашлики на тарілці – замовлення готове. Збери все, щоб пройти рівень.',
-      'Під кожним грилем видно наступний шар. Плануй наперед!'
+      'Темні шашлики позаду – наступний шар. Вони стануть доступні, коли звільниш увесь гриль.',
+      'Деякі грилі їдуть на конвеєрі. Лови потрібний шашлик, поки він на екрані!'
     ],
     boostHelp: { undo: 'скасувати останній хід', slot: 'ще одне місце на решітці', shuffle: 'потрібні шашлики вийдуть нагору', chef: 'кухар сам збере одне замовлення' }
   };
@@ -70,12 +74,14 @@
     pause: 'Pause', resume: 'Resume', restart: 'Restart level', sound: 'Sound', haptics: 'Vibration', on: 'On', off: 'Off',
     howto: 'How to play', ok: 'Got it', noCoins: 'Not enough coins', noUndo: 'Nothing to undo', maxSlots: 'No more slots',
     noChef: 'No order for the chef right now', tutorial: 'Tap a skewer that is in an order',
+    locked: 'Empty the grill first', conveyor: 'Conveyor! The grills move',
     b: { undo: 'Undo', slot: '+1 slot', shuffle: 'Shuffle', chef: 'Chef' },
     rules: [
       'Tap skewers on the grill. If an order needs it, it flies to the plate.',
       'Otherwise the skewer waits on the rack. The rack has only 5 slots.',
       '3 same skewers on a plate complete the order. Serve everything to win.',
-      'You can peek at the next layer under each grill. Plan ahead!'
+      'Dark skewers behind are the next layer. They unlock when the whole grill is empty.',
+      'Some grills ride on a conveyor. Catch the skewer you need while it is on screen!'
     ],
     boostHelp: { undo: 'undo the last move', slot: 'one more rack slot', shuffle: 'needed skewers come to the top', chef: 'the chef serves one order' }
   };
@@ -166,7 +172,7 @@
 
   // ---------- game state ----------
   var def = null, state = null, view = null;
-  var arriving = new Set();
+  var arriving = new Map(); // item id -> number of flyers still on the way
   var flights = new Set();
   var busy = 0, over = false, paused = false;
   var undoStack = [];
@@ -188,7 +194,7 @@
     state = E.createState(def);
     E.start(state);
     undoStack = [];
-    arriving.clear();
+    clearFx();
     busy = 0; over = false; paused = false;
     syncView();
     buildBoard();
@@ -198,43 +204,96 @@
     updateHud();
     layout();
     screen = 'game';
+    beltT = 0;
     if (n === 1 && !Save.data.tutorial) setTimeout(showTutorial, 650);
+    if (belts.length && !Save.data.seenConveyor) {
+      Save.data.seenConveyor = true;
+      Save.save();
+      setTimeout(function () { toast(T.conveyor); }, 500);
+    }
   }
 
   // ---------- board ----------
   function trayW(t) { return t.slots * SW + (t.slots - 1) * CG + PAD * 2; }
 
+  // Conveyor rows: grills ride on a belt that loops around the visible window.
+  var belts = [];
+  var beltT = 0, lastFrame = 0, viewExt = 0;
+
   function buildBoard() {
     var board = $('#board');
     board.innerHTML = '';
     trayEls = [];
+    belts = [];
     var y = 6;
     var k = 0;
-    def.rows.forEach(function (row) {
+    def.rows.forEach(function (row, r) {
+      var info = (def.rowInfo && def.rowInfo[r]) || { conv: false };
+      var rowEl = document.createElement('div');
+      rowEl.className = 'row' + (info.conv ? ' conv' : '');
+      rowEl.style.top = y + 'px';
+      rowEl.style.height = (GH + 4) + 'px';
+      rowEl.style.width = BW + 'px';
+      if (info.conv) {
+        var beltBg = document.createElement('div');
+        beltBg.className = 'belt' + (info.dir < 0 ? ' rev' : '');
+        beltBg.style.animationDuration = (24 / info.speed) + 's';
+        rowEl.appendChild(beltBg);
+      }
+      board.appendChild(rowEl);
       var widths = row.map(function (ti) { return trayW(state.trays[ti]); });
       var total = widths.reduce(function (a, b) { return a + b; }, 0) + TGAP * (row.length - 1);
-      var x = (BW - total) / 2;
+      var x = info.conv ? 0 : (BW - total) / 2;
+      var belt = info.conv ? { row: rowEl, items: [], dir: info.dir, speed: info.speed, len: 0, wmax: Math.max.apply(null, widths) } : null;
       row.forEach(function (ti, j) {
         var tr = state.trays[ti];
         var el = document.createElement('div');
         el.className = 'tray ' + tr.kind;
         el.dataset.t = ti;
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
         el.style.width = widths[j] + 'px';
+        if (!belt) el.style.left = x + 'px';
         var cells = '';
         for (var s = 0; s < tr.slots; s++) cells += '<div class="cell" data-s="' + s + '" style="left:' + (PAD + s * (SW + CG)) + 'px"></div>';
-        el.innerHTML = '<div class="grill">' + cells + '</div><div class="strip"></div><div class="badge"></div>';
-        board.appendChild(el);
+        el.innerHTML = '<div class="grill">' + cells + '</div><div class="badge"></div>';
+        rowEl.appendChild(el);
         trayEls[ti] = el;
+        if (belt) belt.items.push({ el: el, base: x, w: widths[j] });
         x += widths[j] + TGAP;
-        renderTray(ti, true, k++ * 45);
+        renderTray(ti, true, k++ * 40);
       });
-      y += IH + PAD * 2 + STRIP + ROWG;
+      if (belt) { belt.len = x; belts.push(belt); }
+      y += GH + ROWG;
     });
     boardH = y - ROWG + 6;
     board.style.width = BW + 'px';
     board.style.height = boardH + 'px';
+    positionBelts();
+  }
+
+  function positionBelts() {
+    if (!belts.length) return;
+    var win = BW + viewExt * 2;
+    belts.forEach(function (b) {
+      var L = Math.max(b.len, win + b.wmax + TGAP);
+      var shift = b.dir * b.speed * beltT;
+      b.items.forEach(function (it) {
+        var pos = ((it.base + shift) % L + L) % L;
+        var x = pos < L - it.w ? pos : pos - L;
+        it.el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0)';
+      });
+    });
+  }
+
+  function frame(now) {
+    var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
+    lastFrame = now;
+    var moving = belts.length && screen === 'game' && !paused && !over;
+    document.body.classList.toggle('still', !moving);
+    if (moving) {
+      beltT += dt;
+      positionBelts();
+    }
+    requestAnimationFrame(frame);
   }
 
   function itemImg(type, id, cls) {
@@ -247,33 +306,35 @@
     return img;
   }
 
+  // One cell shows the skewer of the top layer and, behind it, the darker skewer of the next layer.
   function renderTray(ti, pop, delay) {
     var tr = state.trays[ti], el = trayEls[ti];
     if (!el) return;
-    var grill = el.children[0], strip = el.children[1], badge = el.children[2];
+    var grill = el.children[0], badge = el.children[1];
     var top = tr.layers[0] || [];
+    var nxt = tr.layers[1] || [];
     for (var s = 0; s < tr.slots; s++) {
       var cell = grill.children[s];
-      var it = top[s];
-      var cur = cell.firstChild;
+      var it = top[s], bk = nxt[s];
+      var curB = cell.querySelector('img.back');
+      if (bk) {
+        if (!curB || +curB.dataset.id !== bk.id) {
+          if (curB) curB.remove();
+          var b = itemImg(bk.type, bk.id, 'back' + (pop ? ' fade' : ''));
+          cell.insertBefore(b, cell.firstChild);
+        }
+      } else if (curB) curB.remove();
+      var curF = cell.querySelector('img.front');
       if (it) {
-        if (!cur || +cur.dataset.id !== it.id) {
-          cell.innerHTML = '';
-          var img = itemImg(it.type, it.id, pop ? 'pop' : '');
+        if (!curF || +curF.dataset.id !== it.id) {
+          if (curF) curF.remove();
+          var img = itemImg(it.type, it.id, 'front' + (pop ? ' pop' : ''));
           if (pop) img.style.animationDelay = ((delay || 0) + s * 50) + 'ms';
           cell.appendChild(img);
         }
-      } else if (cur) cell.innerHTML = '';
+      } else if (curF) curF.remove();
+      cell.classList.toggle('locked', !it && !!bk);
     }
-    var nxt = tr.layers[1];
-    var html = '';
-    if (nxt) {
-      for (var q = 0; q < tr.slots; q++) {
-        html += '<div class="mini" style="left:' + (q * (SW + CG) - 1) + 'px">' + (nxt[q] ? '<img alt="" src="' + A.url(nxt[q].type) + '">' : '') + '</div>';
-      }
-    }
-    strip.innerHTML = html;
-    strip.classList.toggle('empty', !nxt);
     var n = tr.layers.length;
     badge.textContent = n > 1 ? String(n) : '';
     badge.style.display = n > 1 ? '' : 'none';
@@ -284,12 +345,19 @@
     var wrap = $('#boardWrap');
     var board = $('#board');
     if (!wrap || !board) return;
-    var W = wrap.clientWidth - 10, H = wrap.clientHeight - 10;
+    var W = wrap.clientWidth - 8, H = wrap.clientHeight - 8;
     if (W <= 0 || H <= 0) return;
-    var s = Math.min(W / BW, H / boardH, 1.4);
+    var s = Math.min(W / BW, H / boardH, 1.3);
     var x = (wrap.clientWidth - BW * s) / 2;
     var y = Math.max(4, (wrap.clientHeight - boardH * s) / 2);
     board.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+    // conveyor rows run across the whole screen width, not only the board width
+    viewExt = Math.max(0, (wrap.clientWidth / s - BW) / 2);
+    belts.forEach(function (b) {
+      b.row.style.left = (-viewExt) + 'px';
+      b.row.style.width = (BW + viewExt * 2) + 'px';
+    });
+    positionBelts();
   }
 
   // ---------- plates & rack ----------
@@ -377,8 +445,8 @@
     var got = state.collected + inPlates;
     $('#cnt').textContent = got + '/' + state.total;
     $('#bar').style.width = (100 * state.collected / state.total) + '%';
-    $('#lvl').innerHTML = T.level + ' ' + def.n + (def.hard ? '<span class="hard">' + T.hard + '</span>' : '');
-    $('#coins').textContent = Save.data.coins;
+    $('#lvl').innerHTML = T.level + ' ' + def.n + (def.hard ? '<span class="hard" title="' + T.hard + '">🔥</span>' : '');
+    showCoins();
     updateBoosters();
   }
 
@@ -400,21 +468,34 @@
     return false;
   }
 
-  // ---------- flying items ----------
+  // ---------- turn playback ----------
+  // The engine state changes at once on every tap, and the plates and the rack are drawn from it at once.
+  // So taps are never blocked. Animations only decorate the result: flyers carry items to their slots,
+  // and a served plate (a copy over the real plate) waits for its last item, then flies away.
+  var ghosts = new Set();
+  var lastGhost = {};
+  var coinLag = 0; // coins already earned but still flying to the counter
+
+  function markArriving(id) { arriving.set(id, (arriving.get(id) || 0) + 1); }
+
   function targetEl(id) {
-    return document.querySelector('#plates img[data-id="' + id + '"]') || document.querySelector('#rack img[data-id="' + id + '"]');
+    var q = 'img[data-id="' + id + '"]';
+    return document.querySelector('#fx .ghost-plate ' + q) || document.querySelector('#plates ' + q) || document.querySelector('#rack ' + q);
   }
 
   function land(id) {
+    var n = (arriving.get(id) || 1) - 1;
+    if (n > 0) { arriving.set(id, n); return; }
     arriving.delete(id);
     var el = targetEl(id);
     if (el) {
       el.classList.remove('arriving');
       el.animate([{ transform: 'scale(1.18)' }, { transform: 'none' }], { duration: 180, easing: 'ease-out' });
     }
+    ghosts.forEach(checkGhost);
   }
 
-  function flyTo(id, type, from) {
+  function flyTo(id, type, from, delay) {
     var target = targetEl(id);
     if (!target || !from || !from.width) { land(id); return Promise.resolve(); }
     var to = target.getBoundingClientRect();
@@ -432,8 +513,9 @@
         { transform: 'translate(0,0) scale(1,1) rotate(0deg)' },
         { transform: 'translate(' + dx * 0.5 + 'px,' + (dy * 0.5 - 34) + 'px) scale(' + ((1 + sx) / 2 * 1.1) + ',' + ((1 + sy) / 2 * 1.1) + ') rotate(' + (dx > 0 ? 9 : -9) + 'deg)', offset: 0.55 },
         { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ') rotate(0deg)' }
-      ], { duration: dur, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' });
-      var finish = function () { fl.remove(); land(id); resolve(); };
+      ], { duration: dur, delay: delay || 0, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' });
+      var done = false;
+      var finish = function () { if (done) return; done = true; fl.remove(); land(id); resolve(); };
       anim.onfinish = finish;
       anim.oncancel = finish;
     });
@@ -444,18 +526,133 @@
 
   function waitFlights() { return Promise.all(Array.from(flights)); }
 
+  // A copy of a finished plate. It covers the real plate (which already shows the next order)
+  // until all its items have landed, then it flies away.
+  function makeGhost(p, items) {
+    var plateEl = $('#plates').children[p];
+    if (!plateEl) return;
+    var r = plateEl.getBoundingClientRect();
+    var g = document.createElement('div');
+    g.className = 'plate ghost-plate';
+    g.style.cssText = 'position:fixed;margin:0;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px';
+    var inner = document.createElement('div');
+    inner.className = 'plate-in';
+    items.forEach(function (it) {
+      var sl = document.createElement('div');
+      sl.className = 'pslot';
+      sl.appendChild(itemImg(it.type, it.id, arriving.has(it.id) ? 'arriving' : ''));
+      inner.appendChild(sl);
+    });
+    g.appendChild(inner);
+    var prev = lastGhost[p];
+    var fx = $('#fx');
+    if (prev && prev.el.parentNode) fx.insertBefore(g, prev.el); else fx.appendChild(g);
+    var gh = { p: p, el: g, ids: items.map(function (i) { return i.id; }), dead: false };
+    gh.landed = new Promise(function (res) { gh.onLanded = res; });
+    gh.started = new Promise(function (res) { gh.onStarted = res; });
+    gh.gone = new Promise(function (res) { gh.onGone = res; });
+    ghosts.add(gh);
+    lastGhost[p] = gh;
+    Promise.all([prev ? prev.started : null, gh.landed])
+      .then(function () { return sleep(90); })
+      .then(function () { serveGhost(gh); });
+    checkGhost(gh);
+  }
+
+  function checkGhost(gh) {
+    if (gh.ids.every(function (id) { return !arriving.has(id); })) gh.onLanded();
+  }
+
+  function serveGhost(gh) {
+    if (gh.dead) return;
+    gh.onStarted();
+    var r = gh.el.getBoundingClientRect();
+    Sfx.serve(); Hap.impact('medium');
+    coinBurst(r.left + r.width / 2, r.top + r.height / 2, COIN_PER_ORDER);
+    setTimeout(function () { coinLag = Math.max(0, coinLag - COIN_PER_ORDER); showCoins(); }, 700);
+    if (lastGhost[gh.p] === gh) {
+      delete lastGhost[gh.p];
+      var real = $('#plates').children[gh.p];
+      if (real && !real.classList.contains('empty')) { real.classList.remove('enter'); void real.offsetWidth; real.classList.add('enter'); }
+    }
+    var anim = gh.el.animate([
+      { transform: 'scale(1)', opacity: 1 },
+      { transform: 'scale(1.1)', opacity: 1, offset: 0.3 },
+      { transform: 'translateY(-46px) scale(.55)', opacity: 0 }
+    ], { duration: 480, easing: 'ease-in', fill: 'forwards' });
+    var done = function () { gh.el.remove(); ghosts.delete(gh); gh.onGone(); };
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+
+  // Stops all flyers and served plates at once (undo, restart, new level).
+  function clearFx() {
+    ghosts.forEach(function (g) { g.dead = true; g.el.remove(); g.onGone(); });
+    ghosts.clear();
+    lastGhost = {};
+    document.querySelectorAll('#fx .flyer').forEach(function (f) {
+      f.getAnimations().forEach(function (a) { a.cancel(); });
+      f.remove();
+    });
+    arriving.clear();
+    coinLag = 0;
+  }
+
+  function settle() {
+    return waitFlights().then(function () {
+      return Promise.all(Array.from(ghosts).map(function (g) { return g.gone; }));
+    });
+  }
+
+  function showCoins() {
+    $('#coins').textContent = Save.data.coins - coinLag;
+  }
+
   // ---------- input ----------
+  // Big hit area: a tap anywhere on a grill, its frame or the gap next to it picks the nearest skewer slot.
+  var HIT_SLACK = 9; // screen px around each grill
+  function hitCell(e) {
+    var direct = e.target.closest && e.target.closest('.cell');
+    if (direct) return direct;
+    var x = e.clientX, y = e.clientY, best = null, bd = Infinity;
+    for (var ti = 0; ti < trayEls.length; ti++) {
+      var el = trayEls[ti];
+      if (!el) continue;
+      var r = el.getBoundingClientRect();
+      if (x < r.left - HIT_SLACK || x > r.right + HIT_SLACK || y < r.top - HIT_SLACK || y > r.bottom + HIT_SLACK) continue;
+      var dx = Math.max(r.left - x, 0, x - r.right), dy = Math.max(r.top - y, 0, y - r.bottom);
+      var d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = el; }
+    }
+    if (!best) return null;
+    var cells = best.children[0].children, pick = null, px = Infinity;
+    for (var c = 0; c < cells.length; c++) {
+      var cr = cells[c].getBoundingClientRect();
+      var cx = Math.abs(x - (cr.left + cr.width / 2));
+      if (cx < px) { px = cx; pick = cells[c]; }
+    }
+    return pick;
+  }
+
   function onBoardDown(e) {
-    var cell = e.target.closest('.cell');
+    var cell = hitCell(e);
     if (!cell) return;
     e.preventDefault();
     Sfx.unlock();
-    if (busy || over || paused || screen !== 'game') return;
+    if (over || paused || screen !== 'game' || state.done) return;
     var ti = +cell.closest('.tray').dataset.t;
     var si = +cell.dataset.s;
     var top = state.trays[ti].layers[0];
     var it = top && top[si];
-    if (!it) return;
+    if (!it) {
+      if (cell.classList.contains('locked')) {
+        cell.classList.remove('shake'); void cell.offsetWidth; cell.classList.add('shake');
+        setTimeout(function () { cell.classList.remove('shake'); }, 320);
+        Hap.impact('soft');
+        if (!onBoardDown._lockHint) { onBoardDown._lockHint = true; toast(T.locked); }
+      }
+      return;
+    }
     if (!E.canTake(state, ti, si)) {
       cell.classList.remove('shake'); void cell.offsetWidth; cell.classList.add('shake');
       var rack = $('#rack');
@@ -466,7 +663,7 @@
       return;
     }
     hideTutorial();
-    var img = cell.querySelector('img');
+    var img = cell.querySelector('img.front');
     var rects = {};
     rects[it.id] = img ? img.getBoundingClientRect() : cell.getBoundingClientRect();
     undoStack.push(E.clone(state));
@@ -475,103 +672,56 @@
     play(ev, rects);
   }
 
-  var LIGHT = { take: 1, reveal: 1, toPlate: 1, toBuffer: 1 };
-
-  async function play(ev, fromRects) {
-    var heavy = ev.some(function (e) { return !LIGHT[e.t]; });
-    if (heavy) busy++;
+  function play(ev, fromRects) {
+    var s0 = state;
+    var rackBefore = rackRects();
     var touched = {};
     ev.forEach(function (e) { if (e.t === 'take' || e.t === 'reveal') touched[e.tray] = true; });
     Object.keys(touched).forEach(function (ti) { renderTray(+ti, true, 0); });
-    var local = [];
-    var moves = ev.filter(function (e) { return e.t === 'toPlate' || e.t === 'toBuffer'; }).length;
-    try {
-      for (var i = 0; i < ev.length; i++) {
-        var e = ev[i];
-        if (e.t === 'toPlate' || e.t === 'toBuffer') {
-          var before = rackRects();
-          if (e.t === 'toPlate') view.plates[e.plate].items.push({ id: e.id, type: e.type });
-          else view.buffer.splice(e.idx, 0, { id: e.id, type: e.type });
-          arriving.add(e.id);
-          renderPlates();
-          renderRack(before);
-          local.push(flyTo(e.id, e.type, fromRects[e.id]));
-          if (e.t === 'toPlate') { Sfx.tap(); Hap.impact('light'); } else { Sfx.rack(); Hap.impact('soft'); }
-          if (moves > 1) await sleep(110);
-        } else if (e.t === 'complete') {
-          await Promise.all(local); local = [];
-          await sleep(70);
-          servePlate(e.plate);
-          view.plates[e.plate] = { type: null, items: [] };
-          renderPlates();
-          Save.data.coins += COIN_PER_ORDER;
-          Sfx.serve(); Hap.impact('medium');
-          updateHud();
-          await sleep(320);
-        } else if (e.t === 'order') {
-          view.plates[e.plate] = { type: e.type, items: [] };
-          renderPlates(e.plate);
-          await sleep(220);
-        } else if (e.t === 'transfer') {
-          var src = targetEl(e.id);
-          var from = src ? src.getBoundingClientRect() : null;
-          var before2 = rackRects();
-          view.buffer = view.buffer.filter(function (b) { return b.id !== e.id; });
-          view.plates[e.plate].items.push({ id: e.id, type: e.type });
-          arriving.add(e.id);
-          renderPlates();
-          renderRack(before2);
-          local.push(flyTo(e.id, e.type, from));
-          Sfx.tap(); Hap.impact('light');
-          await sleep(100);
-        } else if (e.t === 'win') {
-          await Promise.all(local);
-          await waitFlights();
-          onWin();
-        } else if (e.t === 'stuck') {
-          await Promise.all(local);
-          await waitFlights();
-          onStuck();
-        }
-      }
-      if (heavy) await Promise.all(local);
-    } finally {
-      if (heavy) {
-        busy--;
-        if (!busy) {
-          syncView();
-          renderPlates();
-          renderRack(rackRects());
-        }
-      }
-      updateHud();
-      Save.save();
+    // Follow the plates through the events to know which items each served plate holds.
+    var sim = view.plates.map(function (p) { return { type: p.type, items: p.items.slice() }; });
+    var served = [], moves = [], win = false, stuck = false;
+    ev.forEach(function (e) {
+      if (e.t === 'toPlate' || e.t === 'toBuffer' || e.t === 'transfer') {
+        if (e.t !== 'toBuffer') sim[e.plate].items.push({ id: e.id, type: e.type });
+        moves.push({ e: e, from: e.t === 'transfer' ? rackBefore[e.id] : fromRects[e.id] });
+        markArriving(e.id);
+      } else if (e.t === 'complete') {
+        served.push({ p: e.plate, items: sim[e.plate].items });
+        sim[e.plate] = { type: null, items: [] };
+        Save.data.coins += COIN_PER_ORDER;
+        coinLag += COIN_PER_ORDER;
+      } else if (e.t === 'order') sim[e.plate] = { type: e.type, items: [] };
+      else if (e.t === 'win') win = true;
+      else if (e.t === 'stuck') stuck = true;
+    });
+    syncView();
+    renderPlates();
+    renderRack(rackBefore);
+    served.forEach(function (sv) { makeGhost(sv.p, sv.items); });
+    // Items from the board leave one after another; items from the rack go to a new order after the serve.
+    var t = 0, tt = 380;
+    moves.forEach(function (m) {
+      var e = m.e, delay;
+      if (e.t === 'transfer') { delay = Math.max(tt, t); tt = delay + 100; } else { delay = t; t += 110; }
+      flyTo(e.id, e.type, m.from, delay);
+      var sfx = function () {
+        if (e.t === 'toBuffer') { Sfx.rack(); Hap.impact('soft'); } else { Sfx.tap(); Hap.impact('light'); }
+      };
+      if (delay) setTimeout(sfx, delay); else sfx();
+    });
+    if (win || stuck) {
+      settle().then(function () {
+        if (state !== s0) return;
+        if (win) onWin();
+        else if (!state.done && !E.hasMove(state)) onStuck();
+      });
     }
+    updateHud();
+    Save.save();
   }
 
   // ---------- effects ----------
-  function servePlate(p) {
-    var el = $('#plates').children[p];
-    if (!el) return;
-    var r = el.getBoundingClientRect();
-    var ghost = el.cloneNode(true);
-    ghost.classList.remove('enter');
-    ghost.classList.add('ghost-plate');
-    ghost.style.position = 'fixed';
-    ghost.style.left = r.left + 'px';
-    ghost.style.top = r.top + 'px';
-    ghost.style.width = r.width + 'px';
-    ghost.style.height = r.height + 'px';
-    $('#fx').appendChild(ghost);
-    var anim = ghost.animate([
-      { transform: 'scale(1)', opacity: 1 },
-      { transform: 'scale(1.12)', opacity: 1, offset: 0.35 },
-      { transform: 'translateY(-46px) scale(.55)', opacity: 0 }
-    ], { duration: 560, easing: 'ease-in', fill: 'forwards' });
-    anim.onfinish = function () { ghost.remove(); };
-    coinBurst(r.left + r.width / 2, r.top + r.height / 2, COIN_PER_ORDER);
-  }
-
   function coinBurst(x, y, amount) {
     var fx = $('#fx');
     var target = $('#coinIc').getBoundingClientRect();
@@ -663,22 +813,20 @@
   }
 
   // ---------- boosters ----------
-  async function useBooster(k) {
+  function useBooster(k) {
     Sfx.unlock();
-    if (!state || busy || paused || screen !== 'game') return;
+    if (!state || paused || screen !== 'game') return;
     if (state.done) return;
     if (Save.data.coins < PRICES[k]) { toast(T.noCoins); Sfx.error(); Hap.notify('error'); return; }
     if (k === 'undo' && !undoStack.length) { toast(T.noUndo); return; }
     if (k === 'slot' && state.cap >= E.MAX_CAP) { toast(T.maxSlots); return; }
     if (k === 'chef' && !boosterUsable('chef')) { toast(T.noChef); return; }
     if (k === 'shuffle' && !boosterUsable('shuffle')) return;
-    busy++;
+    hideTutorial();
     try {
-      await waitFlights();
-      hideTutorial();
       if (k === 'undo') {
+        clearFx();
         state = undoStack.pop();
-        arriving.clear();
         syncView();
         state.trays.forEach(function (_, ti) { renderTray(ti, true, 0); });
         renderPlates();
@@ -705,16 +853,13 @@
         var rects = {};
         ev.forEach(function (e) {
           if (e.t !== 'take') return;
-          var trEl = trayEls[e.tray];
-          var img = e.depth === 0 ? trEl.children[0].children[e.slot].querySelector('img') : null;
-          rects[e.id] = (img || trEl.children[1]).getBoundingClientRect();
+          var cellEl = trayEls[e.tray].children[0].children[e.slot];
+          var img = e.depth === 0 ? cellEl.querySelector('img.front') : e.depth === 1 ? cellEl.querySelector('img.back') : null;
+          rects[e.id] = (img || cellEl).getBoundingClientRect();
         });
         Save.data.coins -= PRICES[k];
         Sfx.magic();
-        busy--;
-        updateHud();
-        await play(ev, rects);
-        busy++;
+        play(ev, rects);
         afterRescue();
         return;
       }
@@ -722,7 +867,6 @@
       Sfx.magic(); Hap.impact('medium');
       afterRescue();
     } finally {
-      busy--;
       updateHud();
       Save.save();
     }
@@ -870,11 +1014,12 @@
       b.setAttribute('aria-label', T.b[k]);
       b.addEventListener('click', function () { useBooster(k); });
     });
-    $('#board').addEventListener('pointerdown', onBoardDown);
+    $('#boardWrap').addEventListener('pointerdown', onBoardDown);
     $('#rack').addEventListener('click', function (e) { if (e.target.closest('.add')) useBooster('slot'); });
     $('#pauseBtn').addEventListener('click', function () { Sfx.unlock(); showPause(); });
     $('#overlay').addEventListener('click', onOverlayClick);
     window.addEventListener('resize', layout);
+    requestAnimationFrame(frame);
     await Promise.all([Save.load(), A.preload()]);
     Hap.on = Save.data.haptics !== false;
     // a quiet background level so the start screen has a game behind it

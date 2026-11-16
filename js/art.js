@@ -5,10 +5,12 @@
 
   var NAMES_UK = ['Шашлик', 'Курка', 'Креветки', 'Кукурудза', 'Ковбаска', 'Овочі',
     'Маршмелоу', 'Яблуко в карамелі', 'Полуниця в шоколаді', 'Броколі', 'Печериці', 'Чорниця',
-    'Баклажан', 'Пончик'];
+    'Баклажан', 'Пончик', 'Кавун', 'Ківі', 'Оливки', 'Перепелині яйця', 'Желейні ведмедики', 'Апельсин',
+    'Банан у шоколаді', 'Тефтелі', 'Ананас', 'Цукрова вата'];
   var NAMES_EN = ['Beef kebab', 'Chicken', 'Shrimp', 'Corn', 'Sausage', 'Veggies',
     'Marshmallows', 'Candy apple', 'Choc strawberries', 'Broccoli', 'Mushrooms', 'Blueberries',
-    'Eggplant', 'Donut'];
+    'Eggplant', 'Donut', 'Watermelon', 'Kiwi', 'Olives', 'Quail eggs', 'Gummy bears', 'Orange',
+    'Choc banana', 'Meatballs', 'Pineapple', 'Cotton candy'];
 
   var OL = '#3b1d0e'; // outline colour for every shape
   var CHAR = '#2a0f05'; // grill char marks
@@ -273,6 +275,183 @@
     return wrap(g(30, 25.5, -4, '<use href="#dn"/>') + g(30, 76.5, 5, '<use href="#dn"/>'), defs);
   };
 
+  // 14 Watermelon: red triangle wedges pointing up, green rind at the bottom, black seeds
+  S[14] = function () {
+    var defs = cel('wf', '#ff8a92', '#ff3b4f', '#c81e35') + cel('wr', '#4fb45a', '#2a8a3a', '#17602a');
+    var seeds = '<g fill="#1a0d08">';
+    [[-9, 1, -30], [0, -5, 0], [9, 1, 30], [-4, 6, -15], [5, 6, 15]].forEach(function (s) {
+      seeds += '<ellipse cx="' + s[0] + '" cy="' + s[1] + '" rx="1.8" ry="2.9" transform="rotate(' + s[2] + ' ' + s[0] + ' ' + s[1] + ')"/>';
+    });
+    defs += '<g id="wm">' + P('M0 -16L-25 7Q0 26 25 7Z', 'url(#wr)') + '<path d="M0 -16L-25 7Q0 18 25 7Z" fill="#e2f5b8"/>' +
+      '<path d="M0 -16L-25 7Q0 12 25 7Z" fill="url(#wf)"/>' + P('M0 -16L-25 7Q0 26 25 7Z', 'none') + seeds + '</g>' +
+      hi(-7, -4, 3.4, 1.6, -50, 0.55) + '</g>';
+    function w(cy, rot) { return g(30, cy, rot, '<use href="#wm"/>'); }
+    return wrap(w(18, -5) + w(50, 5) + w(82, -4), defs);
+  };
+
+  // 15 Kiwi: lime-green discs with a white core, black seed ring and brown fuzzy rim
+  S[15] = function () {
+    var defs = cel('kf', '#d8f77a', '#8fd13a', '#5ea82a') + cel('kr', '#b07a44', '#8b5a2b', '#5e3a18');
+    var seeds = '<g fill="#140c06">', rays = '';
+    for (var i = 0; i < 12; i++) {
+      var a = i / 12 * Math.PI * 2, x = f(Math.cos(a) * 10.5), y = f(Math.sin(a) * 6.6);
+      seeds += '<ellipse cx="' + x + '" cy="' + y + '" rx="1.1" ry="2" transform="rotate(' + f(a * 180 / Math.PI + 90) + ' ' + x + ' ' + y + ')"/>';
+      if (i % 2) rays += 'M' + f(Math.cos(a) * 6) + ' ' + f(Math.sin(a) * 3.8) + 'L' + f(Math.cos(a) * 17) + ' ' + f(Math.sin(a) * 11);
+    }
+    defs += '<g id="kw">' + E(0, 0, 25, 16, 'url(#kr)') + '<ellipse rx="21.5" ry="12.8" fill="url(#kf)"/>' +
+      ln(rays, '#effcc0', 1.6, 0.7) + '<ellipse rx="13" ry="8" fill="#c8f080" opacity=".6"/>' + seeds + '</g>' +
+      '<ellipse rx="5.5" ry="3.4" fill="#fffbe6"/>' + hi(-11, -6, 3.4, 1.5, -15, 0.6) + '</g>';
+    function k(cy, rot) { return g(30, cy, rot, '<use href="#kw"/>'); }
+    return wrap(k(18.5, -7) + k(50, 6) + k(81.5, -5), defs);
+  };
+
+  // 16 Olives: alternating glossy black and pimento-stuffed green ovals in a zigzag
+  S[16] = function () {
+    var defs = cel('ob', '#6e6878', '#2c2833', '#100d14') + cel('og', '#d6e276', '#93a932', '#5b6c16') + cel('pm', '#ff7a66', '#e8382a', '#a8180e');
+    var gl = hi(-8, -4.5, 6, 2, -8, 0.85) + hi(9, 4, 1.5, 1.5, 0, 0.6);
+    defs += '<g id="o0">' + E(0, 0, 18, 10, 'url(#ob)') + E(13.5, 0, 2.6, 4, '#0b080e', 2.2) + gl + '</g>' +
+      '<g id="o1">' + E(0, 0, 18, 10, 'url(#og)') + E(13.5, 0, 3.4, 4.8, 'url(#pm)', 2.2) + gl + '</g>';
+    var out = '';
+    [[26, 12, -6], [34, 31.5, 7], [26, 51, -6], [34, 70.5, 7], [26, 90, -6]].forEach(function (o, i) {
+      out += g(o[0], o[1], o[2], '<use href="#o' + (i % 2) + '"/>', i % 2 ? -1 : 0);
+    });
+    return wrap(out, defs);
+  };
+
+  // 17 Quail eggs: speckled cream eggs (pointy top), tilted
+  S[17] = function () {
+    var egg = 'M0 -18C9.5 -18 16 -6.5 16 3C16 12.5 9 18 0 18C-9 18 -16 12.5 -16 3C-16 -6.5 -9.5 -18 0 -18Z';
+    var defs = cel('eq', '#fffef6', '#f1e3c2', '#c9b28a');
+    var sp = '<g fill="#5e3c1e">';
+    [[-6, -9, 2.8, 2], [5, -6, 3.4, 2.4], [-9, 2, 2.4, 1.9], [2, 3, 3.8, 2.6], [10, 7, 2.2, 1.7], [-4, 11, 3, 2.1], [6, -14, 1.7, 1.3], [-1, -3, 1.7, 1.3], [11, -2, 1.5, 1.3], [-11, -5, 1.4, 1.2], [4, 13, 1.6, 1.3]].forEach(function (s, i) {
+      sp += '<ellipse cx="' + s[0] + '" cy="' + s[1] + '" rx="' + s[2] + '" ry="' + s[3] + '" transform="rotate(' + (i * 37 % 90 - 45) + ' ' + s[0] + ' ' + s[1] + ')"' + (i % 3 === 2 ? ' fill="#a07a52"' : '') + '/>';
+    });
+    defs += '<g id="eq1">' + P(egg, 'url(#eq)') + sp + '</g>' + hi(-7, -8, 3, 5, 20, 0.85) + '</g>';
+    function e(x, cy, rot) { return g(x, cy, rot, '<use href="#eq1"/>'); }
+    return wrap(e(27.5, 19.5, -14) + e(32.5, 51, 13) + e(27.5, 82, -12), defs);
+  };
+
+  // 18 Gummy bears: translucent red, yellow, green and orange bears with round ears
+  S[18] = function () {
+    var shp = '<circle cx="-7.5" cy="-13" r="4.2"/><circle cx="7.5" cy="-13" r="4.2"/><circle cy="-6.5" r="8.8"/><ellipse cy="6" rx="10.5" ry="9.5"/>' +
+      '<ellipse cx="-10.5" cy="1" rx="4.5" ry="3.2" transform="rotate(-30 -10.5 1)"/><ellipse cx="10.5" cy="1" rx="4.5" ry="3.2" transform="rotate(30 10.5 1)"/>' +
+      '<ellipse cx="-6.5" cy="14.5" rx="4.8" ry="3.4"/><ellipse cx="6.5" cy="14.5" rx="4.8" ry="3.4"/>';
+    var cols = [['#ff9a9a', '#f0282f', '#a80e1c'], ['#fff6a0', '#ffd21a', '#d39400'], ['#b4f480', '#4ccf2a', '#24881a'], ['#ffc888', '#ff8a1a', '#c85400']];
+    var defs = '<g id="gb"><g fill="' + OL + '" stroke="' + OL + '" stroke-width="5.6">' + shp + '</g><g>' + shp + '</g></g>' +
+      '<g id="gh">' + hi(-4, -10, 3, 1.8, -25, 0.8) + hi(-4.5, 3, 2.4, 4, 15, 0.45) + hi(3, -12, 1, 1, 0, 0.7) +
+      '<circle cx="-3" cy="-7" r="1.3" fill="' + OL + '" opacity=".35"/><circle cx="3" cy="-7" r="1.3" fill="' + OL + '" opacity=".35"/></g>';
+    var out = '';
+    cols.forEach(function (c, i) { defs += cel('b' + i, c[0], c[1], c[2], 0.74); });
+    [[27, 19, -10], [33, 40, 9], [27, 61, -9], [33, 82, 8]].forEach(function (b, i) {
+      out += g(b[0], b[1], b[2], '<g opacity=".93"><use href="#gb" fill="url(#b' + i + ')"/><use href="#gh"/></g>', 0);
+    });
+    return wrap(out, defs);
+  };
+
+  // 19 Orange: half-moon slices (flat side up) with white pith and segment rays
+  S[19] = function () {
+    var defs = cel('or', '#ffb24a', '#ff7f00', '#cc5200') + cel('of', '#ffd884', '#ffa420', '#f07800', 0.75);
+    var rays = '';
+    [30, 60, 90, 120, 150].forEach(function (d) { var a = d * Math.PI / 180; rays += 'M0 -8L' + f(Math.cos(a) * 18.5) + ' ' + f(-9 + Math.sin(a) * 15); });
+    defs += '<g id="os">' + P('M-25 -9H25A25 21 0 0 1 -25 -9Z', 'url(#or)') + '<path d="M-22 -9H22A22 18 0 0 1 -22 -9Z" fill="#fff3d6"/>' +
+      '<path d="M-20 -9H20A20 15.5 0 0 1 -20 -9Z" fill="url(#of)"/>' + ln(rays, '#fff6e0', 2.2, 0.95) +
+      '<path d="M-3.5 -9A3.5 3 0 0 0 3.5 -9Z" fill="#fff6e0"/>' + P('M-25 -9H25A25 21 0 0 1 -25 -9Z', 'none') +
+      hi(-12, -3, 2.6, 1.4, 30, 0.7) + hi(9, 0, 1.6, 1, -30, 0.6) + '</g>';
+    function o(cy, rot) { return g(30, cy, rot, '<use href="#os"/>'); }
+    return wrap(o(11.5, -4) + o(36.5, 5) + o(61.5, -5) + o(86.5, 4), defs);
+  };
+
+  // 20 Chocolate banana: one long curved banana, yellow below, chocolate top with sprinkles
+  S[20] = function () {
+    var B = 'M38 3C8 14 -3 60 26 95Q31 100.5 35.5 96C34 80 34 45 47 9Q46.5 2 38 3Z';
+    var defs = cel('bn', '#fff384', '#ffd424', '#d39a00', 0.7) + cel('bc', '#93522a', '#6b3518', '#3c1c0a', 0.7) +
+      '<clipPath id="bk"><path d="' + B + '"/></clipPath>';
+    var d = 'M0 0H60V50';
+    [[31, 6, 3], [23, 12, 3.5], [14, 7, 3.5]].forEach(function (q) {
+      d += 'H' + (q[0] + q[2]) + 'V' + (50 + q[1]) + 'A' + q[2] + ' ' + q[2] + ' 0 0 1 ' + (q[0] - q[2]) + ' ' + (50 + q[1]) + 'V50';
+    });
+    d += 'H0Z';
+    var cols = ['#fff27a', '#5ad7ff', '#fff', '#ff6fb5', '#7cf06a'], spr = '';
+    [[37, 10, 30], [31, 17, -40], [39, 22, 80], [24, 25, 10], [33, 30, -70], [19, 34, 50], [28, 38, -20], [16, 44, 70], [25, 46, -50]].forEach(function (s, i) {
+      spr += g(s[0], s[1], s[2], ln('M-2.6 0H2.6', cols[i % 5], 3.2));
+    });
+    return wrap(P(B, 'url(#bn)') + ln('M29 52C24 66 24 80 29.5 92', '#fff8c0', 2.6, 0.75) + ln('M37 55C34 70 33 82 34 92', '#c08a00', 2.2, 0.5) +
+      '<g clip-path="url(#bk)">' + P(d, 'url(#bc)', 2.4) + spr + ln('M30 9C22 18 17 30 14 42', '#fff', 2.6, 0.4) + '</g>' +
+      E(31.5, 96, 2.6, 2.6, '#4a2c12', 0) + P(B, 'none'), defs, 60);
+  };
+
+  // 21 Meatballs: four lumpy brown balls, each with a tomato-sauce dollop and parsley
+  S[21] = function () {
+    var defs = cel('mb', '#b8703f', '#8a4a26', '#55280f') + cel('tg', '#ffa070', '#f2582a', '#b82e10', 0.7);
+    var bump = [0.05, -0.04, 0.03, -0.05, 0.06, -0.02, 0.04, -0.05, 0.02, -0.03, 0.05], pts = [], n = 11, i, d;
+    for (i = 0; i < n; i++) { var a = i / n * Math.PI * 2, r = 15 * (1 + bump[i]); pts.push([Math.cos(a) * r * 1.14, Math.sin(a) * r]); }
+    function mid(p, q) { return f((p[0] + q[0]) / 2) + ' ' + f((p[1] + q[1]) / 2); }
+    d = 'M' + mid(pts[n - 1], pts[0]);
+    for (i = 0; i < n; i++) d += 'Q' + f(pts[i][0]) + ' ' + f(pts[i][1]) + ' ' + mid(pts[i], pts[(i + 1) % n]);
+    d += 'Z';
+    var pars = '<g fill="#4cc23e">';
+    [[-5, -9, 20], [5, -6, -40], [-11, 2, 50], [9, 6, -20], [-2, 9, 70]].forEach(function (p) {
+      pars += '<ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx="2.6" ry="1.6" transform="rotate(' + p[2] + ' ' + p[0] + ' ' + p[1] + ')"/>';
+    });
+    defs += '<g id="mbl">' + P(d, 'url(#mb)') + '<g fill="#4a2410" opacity=".55"><circle cx="-6" cy="8" r="1.4"/><circle cx="6" cy="10" r="1.3"/><circle cx="12" cy="0" r="1.2"/><circle cx="-12" cy="-4" r="1.1"/></g><g transform="scale(1.12)">' +
+      P('M-9 -6Q-8.5 -11.5 0 -11.5Q9 -11.5 9.5 -5.5Q10 -1 6.5 0Q5.5 4 3.5 3.5Q2 0.5 -2.5 1Q-4.5 4.5 -6.5 3.5Q-9 1 -9 -6Z', 'url(#tg)', 2.2) +
+      hi(-3, -8.5, 3.4, 1.4, -10, 0.8) + hi(-10.5, 3, 1.4, 2.8, 25, 0.4) + pars + '</g></g></g>';
+    var out = '';
+    [[27.5, 17, -10], [32.5, 39.5, 15], [27.5, 62, -5], [32.5, 84.5, 20]].forEach(function (m) { out += g(m[0], m[1], m[2], '<use href="#mbl"/>'); });
+    return wrap(out, defs);
+  };
+
+  // 22 Pineapple: green leafy crown on top of pale-yellow chunks with a brown diamond pattern
+  S[22] = function () {
+    var ch = 'M-21 -10.5H21Q24 -10.5 23.5 -7L22.5 7Q22 10.5 19 10.5H-19Q-22 10.5 -22.5 7L-23.5 -7Q-24 -10.5 -21 -10.5Z';
+    var defs = cel('pa', '#fffbd0', '#ffe266', '#e0aa32') + cel('lv', '#a6e46a', '#5cbf3a', '#2f8a25') + cel('ld', '#6cc848', '#3d9a2c', '#246e1c') +
+      '<pattern id="dp" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V8M0 0H8" stroke="#b8761e" stroke-width="2.2"/><circle cx="4" cy="4" r="1.2" fill="#8a5410"/></pattern>';
+    defs += '<g id="pc">' + P(ch, 'url(#pa)') + P(ch, 'url(#dp)', 0, ' opacity=".75"') + hi(-13, -5, 5, 1.8, -5, 0.6) + P(ch, 'none') + '</g>';
+    var crown = P('M30 36C21 30 12 24 4 22C10 28 17 34 25 38Z', 'url(#ld)', 2.4) + P('M30 36C39 30 48 24 56 22C50 28 43 34 35 38Z', 'url(#ld)', 2.4) +
+      P('M29 36C23 26 17 16 12 8C20 13 27 22 33 34Z', 'url(#lv)', 2.4) + P('M31 36C37 26 43 16 48 8C40 13 33 22 27 34Z', 'url(#lv)', 2.4) +
+      P('M30 37C25 25 26 12 30 2C34 12 35 25 30 37Z', 'url(#lv)', 2.4);
+    function c(cy, rot) { return g(30, cy, rot, '<use href="#pc"/>'); }
+    return wrap(crown + c(44.5, -3) + c(67, 4) + c(89.5, -3), defs);
+  };
+
+  // 23 Cotton candy: one big fluffy pink cloud with cyan swirls
+  S[23] = function () {
+    var defs = cel('cp', '#fff0f8', '#ffa8d8', '#ee78b8', 0.7), o = '', fi = '';
+    [[30, 18, 15], [16, 24, 10.5], [44, 24, 10.5], [21, 10, 8], [39, 10, 8], [14.5, 40, 9.5], [45.5, 40, 9.5], [30, 40, 17],
+      [16, 58, 9.5], [44, 58, 9.5], [30, 62, 15], [21, 76, 10], [39, 76, 10], [30, 86, 10]].forEach(function (c) {
+      var s = '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="';
+      o += s + (c[2] + 2.8) + '"/>'; fi += s + c[2] + '"/>';
+    });
+    defs += '<clipPath id="cl">' + fi + '</clipPath>';
+    return wrap('<g fill="' + OL + '">' + o + '</g><g fill="url(#cp)">' + fi + '</g>' +
+      '<g clip-path="url(#cl)" opacity=".9">' + ln('M-5 32C12 22 22 42 34 35S52 20 65 27', '#72d6fa', 9) + ln('M-5 68C10 58 24 78 36 71S54 56 65 62', '#72d6fa', 8) +
+      ln('M-5 30C12 20 22 40 34 33S52 18 65 25', '#c8f3ff', 2.6) + '</g>' +
+      hi(22, 12, 4, 2.4, -25, 0.75) + hi(12, 37, 2.6, 2, -40, 0.6) + hi(25, 52, 3, 1.8, -20, 0.5), defs, 60);
+  };
+
+  // Hidden item for foil levels: a skewer wrapped in crumpled silver foil
+  function foil() {
+    var body = 'M18 14L42 13L52 22L55 40L51 55L56 70L52 88L41 99L19 100L8 89L5 72L9 56L4 40L8 22Z';
+    var defs = lg('fo', [[0, '#eef1f5'], [0.2, '#b9c0c8'], [0.36, '#f8fafc'], [0.52, '#9aa3ad'], [0.68, '#e6eaee'], [0.85, '#aab2bb'], [1, '#dfe3e8']], 0, 0, 1, 1);
+    var fac = '';
+    [['M18 14L30 28L8 22Z', 1, 0.55], ['M42 13L30 28L52 22Z', 0, 0.18], ['M8 22L30 28L4 40Z', 0, 0.14], ['M52 22L30 28L55 40Z', 1, 0.45],
+      ['M4 40L30 28L22 50L9 56Z', 1, 0.4], ['M55 40L30 28L22 50L51 55Z', 0, 0.2], ['M9 56L22 50L30 72L5 72Z', 0, 0.16], ['M51 55L22 50L30 72L56 70Z', 1, 0.5],
+      ['M5 72L30 72L8 89Z', 1, 0.3], ['M56 70L30 72L52 88Z', 0, 0.22], ['M8 89L30 72L19 100Z', 0, 0.12], ['M52 88L30 72L41 99Z', 1, 0.4]].forEach(function (q) {
+      fac += '<path d="' + q[0] + '" fill="' + (q[1] ? '#fff' : '#3c4652') + '" opacity="' + q[2] + '"/>';
+    });
+    function spark(x, y, s) { return '<path d="M' + x + ' ' + (y - s) + 'Q' + x + ' ' + y + ' ' + (x + s) + ' ' + y + 'Q' + x + ' ' + y + ' ' + x + ' ' + (y + s) + 'Q' + x + ' ' + y + ' ' + (x - s) + ' ' + y + 'Q' + x + ' ' + y + ' ' + x + ' ' + (y - s) + 'Z" fill="#fff"/>'; }
+    return wrap(P('M23 15Q21 9 15 6.5Q24 3.5 30 10Q36 3.5 45 6.5Q39 9 37 15Z', 'url(#fo)', 2.4) + P(body, 'url(#fo)') + fac +
+      ln('M8 22L30 28L52 22M30 28L22 50L30 72L19 100M22 50L4 40M22 50L51 55M30 72L5 72M30 72L56 70M30 28L55 40M30 72L8 89M30 72L41 99', '#7d8691', 1.5, 0.7) +
+      ln('M18 14L30 28M30 28L4 40M22 50L9 56M30 72L52 88', '#fff', 1.6, 0.8) + P(body, 'none') +
+      spark(16, 34, 4.5) + spark(43, 64, 4) + spark(37, 19, 3), defs);
+  }
+
+  var foilUrl;
+  function mystery() {
+    if (!foilUrl) foilUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(foil());
+    return foilUrl;
+  }
+
   // ---------- caching to data URLs ----------
   var cache = [];
   function url(type) {
@@ -300,5 +479,5 @@
     lock: '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5 V8 C8 5.5 9.8 4 12 4 C14.2 4 16 5.5 16 8 V10.5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>'
   };
 
-  root.Art = { url: url, preload: preload, count: S.length, NAMES_UK: NAMES_UK, NAMES_EN: NAMES_EN, ICONS: ICONS, svg: function (t) { return S[t](); } };
+  root.Art = { url: url, preload: preload, count: S.length, NAMES_UK: NAMES_UK, NAMES_EN: NAMES_EN, ICONS: ICONS, svg: function (t) { return S[t](); }, mystery: mystery };
 })(this);

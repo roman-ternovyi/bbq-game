@@ -3,8 +3,8 @@
 (function (root) {
   'use strict';
 
-  var NUM_TYPES = 14;
-  var GEN_VERSION = 4;
+  var NUM_TYPES = 24;
+  var GEN_VERSION = 5;
   var MAX_CAP = 7;
 
   // ---------- seeded random ----------
@@ -43,20 +43,102 @@
   var POOL_LATE = POOL_MID.concat(['SSGSS', 'SSSSS', 'GGG']);
   var POOL_CONV = ['GGGG', 'GSGSG', 'GGSGG', 'SGSGSG', 'GGGG'];
 
+  // ---------- level modes ----------
+  // Every level has a layout mode. A mode first appears on its "from" level; after that the
+  // unlocked modes rotate, so two levels in a row almost never look the same.
+  var MODES = [
+    { id: 'classic', from: 1 },
+    { id: 'giants', from: 4 },
+    { id: 'conveyor', from: 6, conv: true },
+    { id: 'singles', from: 8 },
+    { id: 'pyramid', from: 10, shape: ['S', 'SS', 'SGS', 'GSG', 'GGG'] },
+    { id: 'tower', from: 13 },
+    { id: 'diamond', from: 16, shape: ['SGS', 'GSG', 'GGG', 'GSG', 'SGS'] },
+    { id: 'carousel', from: 19, conv: true },
+    { id: 'funnel', from: 22, shape: ['GGG', 'GSG', 'SGS', 'SS', 'S'] },
+    { id: 'hourglass', from: 26, shape: ['GGG', 'GSG', 'SS', 'GSG', 'GGG'] }
+  ];
+  // Twists change the rules of one level. From level 9 some levels get one.
+  var TWISTS = [
+    { id: 'turbo', from: 9, needConv: true }, // faster conveyors
+    { id: 'foil', from: 11 },                 // the next layer is wrapped in foil (hidden)
+    { id: 'feast', from: 14 },                // 4 plates, more kinds of food
+    { id: 'tight', from: 18 }                 // rack has 4 places
+  ];
+
+  function rawMode(n) {
+    if (n <= 3) return MODES[0];
+    for (var i = 0; i < MODES.length; i++) if (MODES[i].from === n) return MODES[i];
+    var U = MODES.filter(function (m) { return m.from <= n; });
+    return U[hash(GEN_VERSION, n, 31) % U.length];
+  }
+  function modeFor(n) {
+    var m = rawMode(n);
+    if (n > 4 && m.from !== n && m === rawMode(n - 1)) {
+      var U = MODES.filter(function (x) { return x.from <= n; });
+      m = U[(U.indexOf(m) + 1 + hash(n, 7) % (U.length - 1)) % U.length];
+    }
+    return m;
+  }
+  function twistFor(n, mode) {
+    var ok = function (t) { return t.from <= n && (!t.needConv || mode.conv); };
+    for (var i = 0; i < TWISTS.length; i++) if (TWISTS[i].from === n && ok(TWISTS[i])) return TWISTS[i];
+    var U = TWISTS.filter(ok);
+    if (!U.length) return null;
+    var chance = Math.min(0.55, 0.3 + (n - 9) * 0.01);
+    if ((hash(GEN_VERSION, n, 53) % 1000) / 1000 >= chance) return null;
+    return U[hash(GEN_VERSION, n, 59) % U.length];
+  }
+
   function levelParams(n) {
     var hard = n >= 5 && n % 5 === 0;
-    var types = Math.min(NUM_TYPES, 3 + Math.ceil(n * 0.55));
-    // long levels: 30 skewers on level 1, 75 on level 5, 150 by level 15, up to 300
-    var triples = n <= 3 ? 10 + 5 * (n - 1) : Math.min(100, Math.round(25 + (n - 5) * 2.5));
-    var rowsMin = n <= 1 ? 2 : n <= 3 ? 3 : n <= 6 ? 3 : 4;
-    var rowsMax = n <= 1 ? 2 : n <= 3 ? 3 : n <= 6 ? 4 : 5;
-    if (hard) rowsMin = rowsMax;
-    var pool = n <= 3 ? POOL_EASY : n <= 7 ? POOL_MID : POOL_LATE;
-    // conveyor rows: chance and count grow with the level
-    var conv = { chance: n < 3 ? 0 : n <= 5 ? 0.6 : 0.8, min: n >= 12 ? 1 : 0, max: n < 3 ? 0 : n < 12 ? 1 : 2 };
-    if (hard && n >= 10) conv.min = 2;
-    var speed = 16 + Math.min(16, n * 0.45);
-    var plates = 3;
+    var mode = modeFor(n);
+    if (n === 9) mode = MODES[2]; // the turbo twist is introduced on a conveyor level
+    var twist = twistFor(n, mode);
+    var tw = twist ? twist.id : null;
+    var vary = 0.9 + (hash(GEN_VERSION, n, 71) % 1000) / 1000 * 0.2;
+    // More kinds of food make levels harder: 4 on level 1, 8 on level 10, up to 18.
+    var types = Math.min(18, 3 + Math.ceil(n * 0.5));
+    if (tw === 'feast') types += 2;
+    if (tw === 'tight') types -= 1;
+    types = clamp(types, 3, NUM_TYPES);
+    // Long levels: 30 skewers on level 1, 75 on level 5, up to about 300.
+    var base = n <= 3 ? 10 + 5 * (n - 1) : Math.min(100, Math.round(25 + (n - 5) * 2.5));
+    var lenMul = { tower: 0.8, singles: 0.85, pyramid: 0.8, diamond: 0.9, funnel: 0.8, hourglass: 0.9 }[mode.id] || 1;
+    var triples = Math.max(types + 2, Math.round(base * lenMul * (n <= 3 ? 1 : vary)));
+    var speed = (16 + Math.min(16, n * 0.45)) * (mode.id === 'conveyor' ? 1.15 : 1) * (tw === 'turbo' ? 1.5 : 1);
+
+    var lay = { pool: n <= 3 ? POOL_EASY : n <= 7 ? POOL_MID : POOL_LATE, convPool: POOL_CONV,
+      rowsMin: 4, rowsMax: 5, convChance: 0.8, convMin: n >= 12 ? 1 : 0, convMax: n < 12 ? 1 : 2,
+      speedVar: 0.15, ratio: [1.6, 9], shape: null };
+    if (n <= 1) { lay.rowsMin = lay.rowsMax = 2; }
+    else if (n <= 3) { lay.rowsMin = lay.rowsMax = 3; }
+    else if (n <= 6) { lay.rowsMin = 3; lay.rowsMax = 4; }
+    if (n < 3) { lay.convChance = 0; lay.convMax = 0; }
+    else if (n <= 5) lay.convChance = 0.6;
+    if (mode.id === 'giants') {
+      lay.pool = ['GG', 'GGG', 'GG']; lay.convPool = ['GGGG', 'GGGGG'];
+      lay.rowsMin = 3; lay.convChance = n >= 6 ? 0.4 : 0; lay.convMin = 0; lay.convMax = 1;
+    } else if (mode.id === 'singles') {
+      lay.pool = ['SSSS', 'SSSSS', 'SSSSSS', 'SSSSSSS']; lay.convPool = ['SSSSSSSS', 'SSSSSSSSS'];
+      lay.rowsMin = 3; lay.convChance = 0.4; lay.convMin = 0; lay.convMax = 1; lay.ratio = [2, 12];
+    } else if (mode.id === 'conveyor') {
+      lay.rowsMin = 3; lay.convChance = 1; lay.convMin = 2; lay.convMax = 4;
+    } else if (mode.id === 'carousel') {
+      lay.rowsMin = 3; lay.rowsMax = 4; lay.convChance = 1; lay.convMin = 9; lay.convMax = 9; lay.allConv = true; lay.speedVar = 0.3;
+    } else if (mode.id === 'tower') {
+      lay.pool = ['GGG', 'SGGS', 'GSG', 'GG']; lay.rowsMin = 2; lay.rowsMax = 3;
+      lay.convChance = 0; lay.convMin = 0; lay.convMax = 0; lay.ratio = [4, 16];
+    } else if (mode.shape) {
+      lay.shape = mode.shape; lay.convChance = 0; lay.convMin = 0; lay.convMax = 0; lay.ratio = [1.6, 13];
+    }
+    if (hard) {
+      lay.rowsMin = lay.rowsMax;
+      if (mode.id === 'classic' && n >= 10) lay.convMin = 2;
+    }
+
+    var plates = tw === 'feast' ? 4 : 3;
+    var cap = tw === 'tight' ? 4 : 5;
     var chaos = clamp((n - 4) * 0.006, 0, 0.1) + (hard ? 0.05 : 0);
     var band;
     if (n <= 3) band = [0.8, 1.01];
@@ -66,8 +148,9 @@
     if (hard) band = [band[0] * 0.6, band[1] * 0.75];
     var mix = Math.round(clamp(3 + n * 1.3, 3, 70) * (hard ? 1.4 : 1));
     return {
-      n: n, hard: hard, types: types, triples: triples, rowsMin: rowsMin, rowsMax: rowsMax, pool: pool,
-      conv: conv, speed: speed, plates: plates, cap: 5, chaos: chaos, band: band, mix: mix
+      n: n, hard: hard, mode: mode.id, twist: tw, fresh: { mode: mode.from === n && n > 1, twist: !!twist && twist.from === n },
+      types: types, triples: triples, layout: lay,
+      speed: speed, plates: plates, cap: cap, chaos: chaos, band: band, mix: mix
     };
   }
 
@@ -75,13 +158,16 @@
 
   // Picks the rows of grills for one level: how many rows, their patterns and which rows move.
   function pickLayout(P, rng) {
+    var L = P.layout;
+    if (L.shape) return { rows: L.shape.slice(), info: L.shape.map(function () { return { conv: false }; }) };
     var items = P.triples * 3;
     var best = null;
     for (var tries = 0; tries < 30; tries++) {
-      var nRows = P.rowsMin + Math.floor(rng() * (P.rowsMax - P.rowsMin + 1));
+      var nRows = L.rowsMin + Math.floor(rng() * (L.rowsMax - L.rowsMin + 1));
       var nConv = 0;
-      if (P.conv.max > 0 && rng() < P.conv.chance) nConv = 1 + Math.floor(rng() * P.conv.max);
-      nConv = Math.max(P.conv.min, Math.min(nConv, P.conv.max, nRows - 1));
+      if (L.convMax > 0 && rng() < L.convChance) nConv = 1 + Math.floor(rng() * L.convMax);
+      nConv = Math.max(L.convMin, Math.min(nConv, L.convMax, L.allConv ? nRows : nRows - 1));
+      nConv = Math.min(nConv, L.allConv ? nRows : nRows - 1);
       var order = [];
       for (var r = 0; r < nRows; r++) order.push(r);
       var convSet = shuffle(order, rng).slice(0, nConv);
@@ -89,14 +175,14 @@
       var dir = rng() < 0.5 ? 1 : -1;
       for (var q = 0; q < nRows; q++) {
         var isConv = convSet.indexOf(q) >= 0;
-        var pat = isConv ? POOL_CONV[Math.floor(rng() * POOL_CONV.length)] : P.pool[Math.floor(rng() * P.pool.length)];
+        var pat = isConv ? L.convPool[Math.floor(rng() * L.convPool.length)] : L.pool[Math.floor(rng() * L.pool.length)];
         rows.push(pat);
-        info.push(isConv ? { conv: true, dir: dir, speed: Math.round(P.speed * (0.85 + rng() * 0.3)) } : { conv: false });
+        info.push(isConv ? { conv: true, dir: dir, speed: Math.round(P.speed * (1 - L.speedVar + rng() * 2 * L.speedVar)) } : { conv: false });
         if (isConv) dir = -dir;
         slots += slotsOf(pat);
       }
       var ratio = items / slots;
-      var score = ratio < 1.6 ? 1.6 - ratio : ratio > 9 ? ratio - 9 : 0;
+      var score = ratio < L.ratio[0] ? L.ratio[0] - ratio : ratio > L.ratio[1] ? ratio - L.ratio[1] : 0;
       if (!best || score < best.score) best = { rows: rows, info: info, score: score };
       if (score === 0) break;
     }
@@ -197,7 +283,7 @@
     }
 
     return {
-      n: P.n, hard: P.hard, plates: P.plates, cap: P.cap, chaos: P.chaos,
+      n: P.n, hard: P.hard, mode: P.mode, twist: P.twist, fresh: P.fresh, plates: P.plates, cap: P.cap, chaos: P.chaos,
       seed: hash(GEN_VERSION, P.n, attempt, 99),
       rows: rows, rowInfo: layout.info,
       trays: trays.map(function (t) { return { kind: t.kind, slots: t.slots, layers: t.layers }; }),
@@ -496,11 +582,11 @@
   // The mixing window adapts: too easy -> mix more, too hard -> mix less.
   function generateLevel(n) {
     var P = levelParams(n);
-    var mix = P.mix;
+    var mix = P.mix, types = P.types;
     var best = null;
     for (var a = 0; a < 40; a++) {
       var rng = mulberry32(hash(GEN_VERSION, n, a));
-      var def = buildDef(Object.assign({}, P, { mix: mix }), rng, a);
+      var def = buildDef(Object.assign({}, P, { mix: mix, types: Math.min(types, P.triples) }), rng, a);
       if (!def) continue;
       var rate = solveRate(def, 32, hash(n, a, 777));
       def.rate = rate;
@@ -509,15 +595,21 @@
       var dist = rate < P.band[0] ? P.band[0] - rate : rate - P.band[1];
       if (rate === 0) dist += 1;
       if (!best || dist < best.dist) best = { def: def, dist: dist };
-      if (rate > P.band[1]) mix = Math.ceil(mix * 1.35) + 1;
-      else mix = Math.max(0, Math.floor(mix * 0.7));
+      // Too easy: mix the order more, then add a kind of food. Too hard: the reverse.
+      if (rate > P.band[1]) {
+        if (mix >= 60 || rate > 0.99) types = Math.min(NUM_TYPES, types + 1);
+        mix = Math.min(120, Math.ceil(mix * 1.35) + 1);
+      } else {
+        if (mix === 0 || rate < P.band[0] * 0.6) types = Math.max(4, types - 1);
+        mix = Math.max(0, Math.floor(mix * 0.7));
+      }
     }
     return best.def;
   }
 
   var Engine = {
     NUM_TYPES: NUM_TYPES, MAX_CAP: MAX_CAP,
-    levelParams: levelParams, generateLevel: generateLevel, solveRate: solveRate,
+    MODES: MODES, TWISTS: TWISTS, levelParams: levelParams, generateLevel: generateLevel, solveRate: solveRate,
     createState: createState, start: start, clone: clone, visible: visible,
     accepting: accepting, canTake: canTake, tap: tap, hasMove: hasMove, finish: finish,
     addSlot: addSlot, smartShuffle: smartShuffle, chef: chef, mulberry32: mulberry32, hash: hash

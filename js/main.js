@@ -57,13 +57,26 @@
     howto: 'Як грати', ok: 'Зрозуміло', noCoins: 'Не вистачає монет', noUndo: 'Нема що скасувати', maxSlots: 'Більше місць не можна',
     noChef: 'Зараз немає замовлення для кухаря', tutorial: 'Торкнись шашлика, який є в замовленні',
     locked: 'Спочатку звільни гриль', conveyor: 'Конвеєр! Грилі рухаються',
+    newMode: 'Новинка!',
+    modes: {
+      classic: ['Класика', 'Звичайний гриль'], giants: ['Великі грилі', 'Тільки грилі на 3 шашлики'],
+      conveyor: ['Конвеєр', 'Майже всі ряди їдуть'], singles: ['Шпажки', 'Тільки малі грилі з високими стосами'],
+      pyramid: ['Піраміда', 'Грилі стоять пірамідою'], tower: ['Вежа', 'Мало грилів, зате глибокі стоси'],
+      diamond: ['Ромб', 'Грилі стоять ромбом'], carousel: ['Карусель', 'Усі ряди їдуть по колу'],
+      funnel: ['Лійка', 'Широко вгорі, вузько внизу'], hourglass: ['Пісочний годинник', 'Вузька середина']
+    },
+    twists: {
+      turbo: ['Турбо', 'конвеєри їдуть швидше'], foil: ['У фользі', 'наступний шар загорнутий у фольгу'],
+      feast: ['Бенкет', '4 тарілки і більше видів їжі'], tight: ['Тісна решітка', 'на решітці лише 4 місця']
+    },
     b: { undo: 'Назад', slot: '+1 місце', shuffle: 'Перемішати', chef: 'Кухар' },
     rules: [
       'Торкайся шашликів на грилі. Якщо такий шашлик є в замовленні, він полетить на тарілку.',
       'Якщо замовлення немає, шашлик чекає на решітці. На ній лише 5 місць.',
       '3 однакові шашлики на тарілці – замовлення готове. Збери все, щоб пройти рівень.',
       'Темні шашлики позаду – наступний шар. Вони стануть доступні, коли звільниш увесь гриль.',
-      'Деякі грилі їдуть на конвеєрі. Лови потрібний шашлик, поки він на екрані!'
+      'Деякі грилі їдуть на конвеєрі. Лови потрібний шашлик, поки він на екрані!',
+      'Кожен рівень має свій режим: піраміда, вежа, карусель та інші. Інколи є особливе правило, наприклад фольга або 4 тарілки.'
     ],
     boostHelp: { undo: 'скасувати останній хід', slot: 'ще одне місце на решітці', shuffle: 'потрібні шашлики вийдуть нагору', chef: 'кухар сам збере одне замовлення' }
   };
@@ -75,13 +88,26 @@
     howto: 'How to play', ok: 'Got it', noCoins: 'Not enough coins', noUndo: 'Nothing to undo', maxSlots: 'No more slots',
     noChef: 'No order for the chef right now', tutorial: 'Tap a skewer that is in an order',
     locked: 'Empty the grill first', conveyor: 'Conveyor! The grills move',
+    newMode: 'New!',
+    modes: {
+      classic: ['Classic', 'A regular grill'], giants: ['Big grills', 'Only grills for 3 skewers'],
+      conveyor: ['Conveyor', 'Almost all rows move'], singles: ['Skewer rows', 'Only small grills with tall stacks'],
+      pyramid: ['Pyramid', 'Grills form a pyramid'], tower: ['Tower', 'Few grills, deep stacks'],
+      diamond: ['Diamond', 'Grills form a diamond'], carousel: ['Carousel', 'All rows go round'],
+      funnel: ['Funnel', 'Wide at the top, narrow at the bottom'], hourglass: ['Hourglass', 'Narrow in the middle']
+    },
+    twists: {
+      turbo: ['Turbo', 'conveyors run faster'], foil: ['Foil', 'the next layer is wrapped in foil'],
+      feast: ['Feast', '4 plates and more kinds of food'], tight: ['Tight rack', 'the rack has only 4 slots']
+    },
     b: { undo: 'Undo', slot: '+1 slot', shuffle: 'Shuffle', chef: 'Chef' },
     rules: [
       'Tap skewers on the grill. If an order needs it, it flies to the plate.',
       'Otherwise the skewer waits on the rack. The rack has only 5 slots.',
       '3 same skewers on a plate complete the order. Serve everything to win.',
       'Dark skewers behind are the next layer. They unlock when the whole grill is empty.',
-      'Some grills ride on a conveyor. Catch the skewer you need while it is on screen!'
+      'Some grills ride on a conveyor. Catch the skewer you need while it is on screen!',
+      'Each level has its own mode: pyramid, tower, carousel and more. Some levels add a special rule, such as foil or 4 plates.'
     ],
     boostHelp: { undo: 'undo the last move', slot: 'one more rack slot', shuffle: 'needed skewers come to the top', chef: 'the chef serves one order' }
   };
@@ -206,11 +232,47 @@
     screen = 'game';
     beltT = 0;
     if (n === 1 && !Save.data.tutorial) setTimeout(showTutorial, 650);
-    if (belts.length && !Save.data.seenConveyor) {
+    document.body.style.setProperty('--cloth', 'rgba(' + (CLOTH[def.mode] || CLOTH.classic) + ',.45)');
+    var bannered = n >= 4 && showBanner();
+    if (!bannered && belts.length && !Save.data.seenConveyor) {
       Save.data.seenConveyor = true;
       Save.save();
       setTimeout(function () { toast(T.conveyor); }, 500);
     }
+  }
+
+  // ---------- level mode ----------
+  var CLOTH = { classic: '214,48,49', giants: '230,126,34', conveyor: '41,128,185', singles: '39,174,96', pyramid: '142,68,173',
+    tower: '22,160,133', diamond: '232,67,147', carousel: '63,81,181', funnel: '183,128,26', hourglass: '96,125,139' };
+  var foilUrl = null;
+
+  function modeLine() {
+    var m = T.modes[def.mode];
+    if (!m) return '';
+    return m[0] + (def.twist ? ' · ' + T.twists[def.twist][0] : '');
+  }
+
+  function showBanner() {
+    document.querySelectorAll('.banner').forEach(function (b) { b.remove(); });
+    var m = T.modes[def.mode];
+    if (!m) return false;
+    var tw = def.twist && T.twists[def.twist];
+    var fresh = def.fresh && (def.fresh.mode || def.fresh.twist);
+    var el = document.createElement('div');
+    el.className = 'banner';
+    el.innerHTML = (def.fresh && def.fresh.mode ? '<em>' + T.newMode + '</em>' : '') +
+      '<small>' + T.level + ' ' + def.n + '</small><b>' + m[0] + '</b><span>' + m[1] + '</span>' +
+      (tw ? '<i class="tw">' + (def.fresh.twist ? '<em>' + T.newMode + '</em> ' : '') + tw[0] + ': ' + tw[1] + '</i>' : '');
+    document.body.appendChild(el);
+    var a = el.animate([
+      { transform: 'translate(-50%,-50%) scale(.75)', opacity: 0 },
+      { transform: 'translate(-50%,-50%) scale(1.04)', opacity: 1, offset: 0.08 },
+      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.14 },
+      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.85 },
+      { transform: 'translate(-50%,-70%) scale(.95)', opacity: 0 }
+    ], { duration: fresh ? 3400 : 2400, easing: 'ease-out', fill: 'forwards' });
+    a.onfinish = function () { el.remove(); };
+    return true;
   }
 
   // ---------- board ----------
@@ -320,7 +382,9 @@
       if (bk) {
         if (!curB || +curB.dataset.id !== bk.id) {
           if (curB) curB.remove();
-          var b = itemImg(bk.type, bk.id, 'back' + (pop ? ' fade' : ''));
+          var foil = def.twist === 'foil' && A.mystery;
+          var b = itemImg(bk.type, bk.id, 'back' + (foil ? ' foil' : '') + (pop ? ' fade' : ''));
+          if (foil) b.src = foilUrl || (foilUrl = A.mystery());
           cell.insertBefore(b, cell.firstChild);
         }
       } else if (curB) curB.remove();
@@ -925,7 +989,7 @@
     if (screen !== 'game' || over) return;
     paused = true;
     hideTutorial();
-    showOverlay('<h2>' + T.pause + '</h2>' +
+    showOverlay('<h2>' + T.pause + '</h2><p class="mode-line">' + T.level + ' ' + def.n + ' · ' + modeLine() + '</p>' +
       '<div class="toggle-row"><span>' + T.sound + '</span><button class="switch' + (Save.data.sound ? '' : ' off') + '" data-act="sound">' + (Save.data.sound ? T.on : T.off) + '</button></div>' +
       '<div class="toggle-row"><span>' + T.haptics + '</span><button class="switch' + (Save.data.haptics ? '' : ' off') + '" data-act="haptics">' + (Save.data.haptics ? T.on : T.off) + '</button></div>' +
       '<button class="btn" data-act="resume">' + T.resume + '</button>' +

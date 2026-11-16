@@ -11,7 +11,7 @@
   var SW = 40, IH = 80, PAD = 5, CG = 2, TOPP = 9, TGAP = 7, ROWG = 10, BW = 420;
   var GH = TOPP + IH + PAD;
   var PRICES = { undo: 20, slot: 40, shuffle: 50, chef: 70 };
-  var COIN_PER_ORDER = 2;
+  var COIN_PER_ORDER = 1;
   var START_COINS = 150;
 
   // ---------- Telegram ----------

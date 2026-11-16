@@ -4,7 +4,7 @@
   'use strict';
 
   var NUM_TYPES = 24;
-  var GEN_VERSION = 5;
+  var GEN_VERSION = 6;
   var MAX_CAP = 7;
 
   // ---------- seeded random ----------
@@ -140,17 +140,21 @@
     var plates = tw === 'feast' ? 4 : 3;
     var cap = tw === 'tight' ? 4 : 5;
     var chaos = clamp((n - 4) * 0.006, 0, 0.1) + (hard ? 0.05 : 0);
+    // Share of new orders that ask for food buried deep, not for food the player can reach.
+    var mean = n <= 3 ? 0 : n <= 8 ? 0.12 : n <= 15 ? 0.18 : 0.16;
+    if (hard) mean += 0.08;
+    // Target win rate of the careful simulated player, who uses no boosters.
     var band;
-    if (n <= 3) band = [0.8, 1.01];
-    else if (n <= 8) band = [0.45, 1.01];
-    else if (n <= 15) band = [0.25, 0.92];
-    else band = [0.28, 0.85]; // long levels: the simple simulator plays worse than a person
+    if (n <= 3) band = [0.85, 1.01];
+    else if (n <= 8) band = [0.5, 0.92];
+    else if (n <= 15) band = [0.35, 0.7];
+    else band = [0.25, 0.5];
     if (hard) band = [band[0] * 0.6, band[1] * 0.75];
     var mix = Math.round(clamp(3 + n * 1.3, 3, 70) * (hard ? 1.4 : 1));
     return {
       n: n, hard: hard, mode: mode.id, twist: tw, fresh: { mode: mode.from === n && n > 1, twist: !!twist && twist.from === n },
       types: types, triples: triples, layout: lay,
-      speed: speed, plates: plates, cap: cap, chaos: chaos, band: band, mix: mix
+      speed: speed, plates: plates, cap: cap, chaos: chaos, mean: mean, band: band, mix: mix
     };
   }
 
@@ -283,7 +287,7 @@
     }
 
     return {
-      n: P.n, hard: P.hard, mode: P.mode, twist: P.twist, fresh: P.fresh, plates: P.plates, cap: P.cap, chaos: P.chaos,
+      n: P.n, hard: P.hard, mode: P.mode, twist: P.twist, fresh: P.fresh, plates: P.plates, cap: P.cap, chaos: P.chaos, mean: P.mean,
       seed: hash(GEN_VERSION, P.n, attempt, 99),
       rows: rows, rowInfo: layout.info,
       trays: trays.map(function (t) { return { kind: t.kind, slots: t.slots, layers: t.layers }; }),
@@ -312,7 +316,7 @@
     for (var p = 0; p < def.plates; p++) plates.push({ type: null, items: [] });
     return {
       trays: trays, plates: plates, buffer: [], cap: def.cap, unassigned: unassigned,
-      collected: 0, total: id, orderSeq: 0, seed: def.seed, chaos: def.chaos, done: false
+      collected: 0, total: id, orderSeq: 0, seed: def.seed, chaos: def.chaos, mean: def.mean || 0, done: false
     };
   }
 
@@ -355,15 +359,23 @@
     }
     if (!cands.length) return null;
     var rng = mulberry32(hash(s.seed, 0x9e37, s.orderSeq++));
-    if (rng() < s.chaos) return cands[Math.floor(rng() * cands.length)];
+    var roll = rng();
+    if (roll < s.chaos) return cands[Math.floor(rng() * cands.length)];
+    var mean = (s.mean || 0) * (s.buffer.length >= s.cap - 1 ? 0.5 : 1);
+    var helpful = roll >= s.chaos + mean; // otherwise ask for food that is hard to reach
     var buf = countBy(s.buffer);
     var top = countBy(visible(s));
-    var nxt = [];
-    for (var k = 0; k < NUM_TYPES; k++) nxt.push(0);
-    s.trays.forEach(function (tr) { (tr.layers[1] || []).forEach(function (it) { if (it) nxt[it.type]++; }); });
+    var nxt = countBy([]), nxt2 = countBy([]);
+    s.trays.forEach(function (tr) {
+      (tr.layers[1] || []).forEach(function (it) { if (it) nxt[it.type]++; });
+      (tr.layers[2] || []).forEach(function (it) { if (it) nxt2[it.type]++; });
+    });
     var best = cands[0], bs = -1e9;
     cands.forEach(function (t) {
-      var sc = buf[t] * 10 + top[t] * 3 + nxt[t] + rng() * 0.9;
+      // Helpful: food in the rack or on top. Not helpful: food the player cannot reach now,
+      // but which lies 1-2 layers deeper, so the player has to dig for it.
+      var sc = helpful ? buf[t] * 10 + top[t] * 3 + nxt[t] : -(buf[t] * 10 + top[t] * 3) + nxt[t] * 2 + nxt2[t];
+      sc += rng() * 0.9;
       if (sc > bs) { bs = sc; best = t; }
     });
     return best;
@@ -540,29 +552,31 @@
   }
 
   // ---------- solvability simulator ----------
+  // A careful player: takes food the plates need, prefers moves that open useful food in
+  // the next layer (hidden under foil), and keeps pairs together in the rack. No boosters.
   function simulate(def, rng) {
     var s = createState(def);
     start(s);
-    for (var step = 0; step < 3000; step++) {
+    var foil = def.twist === 'foil';
+    for (var step = 0; step < 4000; step++) {
       if (s.done) return true;
       var vis = visible(s);
       if (!vis.length) return false;
+      var buf = countBy(s.buffer), vc = countBy(vis), nx = countBy([]);
+      if (!foil) s.trays.forEach(function (tr) { (tr.layers[1] || []).forEach(function (it) { if (it) nx[it.type]++; }); });
+      var reveal = function (v) {
+        var tr = s.trays[v.tray];
+        if (foil || !tr.layers[1] || tr.layers[0].filter(Boolean).length !== 1) return 0;
+        return tr.layers[1].filter(function (it) { return it && (buf[it.type] || accepting(s, it.type) >= 0); }).length;
+      };
+      var pick = null, bs = -1e9;
       var matches = vis.filter(function (v) { return accepting(s, v.type) >= 0; });
-      var pick;
       if (matches.length) {
-        var rev = matches.filter(function (v) {
-          var tr = s.trays[v.tray];
-          return tr.layers.length > 1 && tr.layers[0].filter(Boolean).length === 1;
-        });
-        var from = rev.length && rng() < 0.6 ? rev : matches;
-        pick = from[Math.floor(rng() * from.length)];
+        matches.forEach(function (v) { var sc = reveal(v) * 2 + rng(); if (sc > bs) { bs = sc; pick = v; } });
       } else {
         if (s.buffer.length >= s.cap) return false;
-        var buf = countBy(s.buffer);
-        var vc = countBy(vis);
-        var bs = -1e9;
         vis.forEach(function (v) {
-          var sc = buf[v.type] * 3 + vc[v.type] + rng() * 2.5;
+          var sc = buf[v.type] * 10 + vc[v.type] * 2 + nx[v.type] + reveal(v) + rng() * 0.8;
           if (sc > bs) { bs = sc; pick = v; }
         });
       }
@@ -594,13 +608,13 @@
       if (rate >= P.band[0] && rate <= P.band[1]) return def;
       var dist = rate < P.band[0] ? P.band[0] - rate : rate - P.band[1];
       if (rate === 0) dist += 1;
-      if (!best || dist < best.dist) best = { def: def, dist: dist };
+      if (!best || dist <= best.dist) best = { def: def, dist: dist };
       // Too easy: mix the order more, then add a kind of food. Too hard: the reverse.
       if (rate > P.band[1]) {
         if (mix >= 60 || rate > 0.99) types = Math.min(NUM_TYPES, types + 1);
         mix = Math.min(120, Math.ceil(mix * 1.35) + 1);
       } else {
-        if (mix === 0 || rate < P.band[0] * 0.6) types = Math.max(4, types - 1);
+        if (mix === 0 || rate < P.band[0] * 0.6) types = Math.max(Math.min(P.types, a < 28 ? 10 : 7), types - 1);
         mix = Math.max(0, Math.floor(mix * 0.7));
       }
     }
